@@ -35,8 +35,8 @@ class Student(Base, TimeStampsMixin):
     __tablename__ = "students"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
-    full_name = Column(String(255), nullable=False)
-    kana_name = Column(String(255), nullable=False)
+    full_name = Column(String(255), nullable=False, index=True)
+    kana_name = Column(String(255), nullable=False, index=True)
     student_code = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(255), unique=True, nullable=False)
     avatar_url = Column(String(500), nullable=True)
