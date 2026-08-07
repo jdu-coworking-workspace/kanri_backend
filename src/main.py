@@ -3,6 +3,7 @@ from fastapi import FastAPI
 # pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
 from src.config import settings
+from src.api.v1.router import api_router
 
 app = FastAPI(
     title="Cowork Management API",
@@ -21,3 +22,5 @@ app.add_middleware(
 @app.get("/")
 def root():
     return {"message":"Cowork API is running"}
+
+app.include_router(api_router, prefix="/api/v1")
