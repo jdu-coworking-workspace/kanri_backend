@@ -7,11 +7,13 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+from src.models.user import UserRole
+
 class UserOut(BaseModel):
     id: UUID
     email: EmailStr
     full_name: str
-    is_editor: bool
+    role: UserRole
     created_at: datetime
 
     class Config:

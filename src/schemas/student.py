@@ -62,3 +62,18 @@ class StudentListSchema(BaseModel):
     total: int
     page: int
     limit: int
+
+
+class StudentHistoryItemSchema(BaseModel):
+    project_id: UUID
+    project_name: str
+    joined_at: datetime
+    left_at: Optional[datetime] = None
+    is_leader: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class StudentDetailSchema(StudentOutSchema):
+    history: List[StudentHistoryItemSchema] = []

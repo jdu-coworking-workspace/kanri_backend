@@ -13,13 +13,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
-def create_access_token(subject: Union[str, Any], is_editor: bool) -> str:
+def create_access_token(subject: Union[str, Any], role: str) -> str:
 
     expire = datetime.utcnow() + timedelta(minutes=settings.JWT_EXPIRES_MINUTES)
     to_encode = {
         "exp": expire, 
         "sub": str(subject), 
-        "is_editor": is_editor
+        "role": role
     }
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 

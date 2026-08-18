@@ -5,7 +5,9 @@ from uuid import UUID
 from sqlalchemy import or_
 
 # pyrefly: ignore [missing-import]
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
+# pyrefly: ignore [missing-import]
+from src.models.project_member import ProjectMember
 
 from src.models.student import Student
 
@@ -72,3 +74,13 @@ class StudentRepository:
     def delete(db: Session, student: Student) -> None:
         db.delete(student)
         db.commit()
+
+    @staticmethod
+    def get_memberships(db: Session, student_id: UUID) -> List:
+        return (
+            db.query(ProjectMember)
+            .options(joinedload(ProjectMember.project))
+            .filter(ProjectMember.student_id == student_id)
+            .order_by(ProjectMember.joined_at.desc())
+            .all()
+        )

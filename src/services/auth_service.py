@@ -21,7 +21,7 @@ def authenticate_user(db: Session, login_data: LoginRequest):
             detail="Email yoki parol noto'g'ri"
         )
     
-    token = create_access_token(subject=user.id, is_editor=user.is_editor)
+    token = create_access_token(subject=user.id, role=user.role.value)
 
     return user, token
 

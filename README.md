@@ -74,7 +74,18 @@ Ensure your PostgreSQL database (e.g., `cowork_db`) is created. Then, run the Al
 alembic upgrade head
 ```
 
-### 5. Running the Application
+### 5. Seeding the Database
+You can populate the database with initial dummy users (both Admins and Staffs) by running the seed script:
+
+```bash
+python src/database/seed_users.py
+```
+
+This will create test accounts, for example:
+- `adminexample1@gmail.com` / `password123` (Admin)
+- `staffexample1@gmail.com` / `password123` (Staff)
+
+### 6. Running the Application
 Start the FastAPI development server using Uvicorn:
 
 ```bash
@@ -85,5 +96,9 @@ The API will be available at `http://localhost:8000`.
 - Interactive API Documentation (Swagger UI): `http://localhost:8000/docs`
 - ReDoc Documentation: `http://localhost:8000/redoc`
 
-## 🔐 Authentication
+## 🔐 Authentication & RBAC
 The API uses cookie-based JWT authentication. Upon successful login (`POST /api/v1/auth/login`), an `HttpOnly` cookie is set in the client's browser. Subsequent requests will automatically include this cookie. Ensure `CORS_ORIGIN` is configured correctly to allow credentials (cookies) to be sent from your frontend domain.
+
+The system enforces **Role-Based Access Control (RBAC)**:
+- **Admin** (`role = 'admin'`): Has full access to create, update, and delete records (Students, Projects, and Users).
+- **Staff** (`role = 'staff'`): Has read-only access (view records). Write operations (`POST`, `PUT`, `DELETE`) will return `403 Forbidden`.

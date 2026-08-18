@@ -94,6 +94,12 @@ class StudentService:
         StudentRepository.delete(db, student)
 
     @staticmethod
+    def get_student_with_history(db: Session, student_id: UUID):
+        student = StudentService.get_student(db, student_id)
+        memberships = StudentRepository.get_memberships(db, student_id)
+        return student, memberships
+
+    @staticmethod
     def copy_student(
         db: Session,
         student_id: UUID,
@@ -108,7 +114,7 @@ class StudentService:
             "kana_name": copy_data.kana_name or source.kana_name,
             "student_code": copy_data.student_code,
             "email": copy_data.email,
-            "avatar_url": source.avatar_url,
+            "avatar_url": None,  # nusxada yangi avatar alohida yuklanadi
             "grad_year_month": source.grad_year_month,
             "semester": source.semester,
             "skill_rank": source.skill_rank,
