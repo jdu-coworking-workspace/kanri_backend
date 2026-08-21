@@ -1,8 +1,9 @@
-from typing import Optional
+from typing import Optional, cast
 from uuid import UUID
 
 # pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, Query, status
+
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
@@ -12,6 +13,8 @@ from src.models.project import ProjectStatus, ProjectCategory
 from src.models.user import User
 from src.schemas.project import (
     ProjectCreateSchema,
+    ProjectMemberAddSchema,
+    ProjectMemberMoveSchema,
     ProjectUpdateSchema,
     ProjectListOutSchema,
 )
@@ -30,9 +33,13 @@ def get_projects(
     page: int = Query(1, ge=1, description="Sahifa raqami"),
     limit: int = Query(10, ge=1, le=100, description="Sahifadagi yozuvlar soni"),
     name: Optional[str] = Query(None, description="Loyiha nomi bo'yicha qidiruv"),
-    member: Optional[str] = Query(None, description="A'zo ismi yoki kodi bo'yicha qidiruv"),
+    member: Optional[str] = Query(
+        None, description="A'zo ismi yoki kodi bo'yicha qidiruv"
+    ),
     status: Optional[ProjectStatus] = Query(None, description="Loyiha holati"),
-    category: Optional[ProjectCategory] = Query(None, description="Loyiha kategoriyasi"),
+    category: Optional[ProjectCategory] = Query(
+        None, description="Loyiha kategoriyasi"
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -69,10 +76,7 @@ def get_project(
     current_user: User = Depends(get_current_user),
 ):
     project = ProjectService.get_project(db, id)
-    return {
-        "success": True,
-        "data": project
-    }
+    return {"success": True, "data": project}
 
 
 @router.post(
@@ -85,11 +89,8 @@ def create_project(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    project = ProjectService.create_project(db, project_in, current_user.id)
-    return {
-        "success": True,
-        "data": project
-    }
+    project = ProjectService.create_project(db, project_in, cast(UUID, current_user.id))
+    return {"success": True, "data": project}
 
 
 @router.put(
@@ -103,10 +104,7 @@ def update_project(
     current_user: User = Depends(require_admin),
 ):
     project = ProjectService.update_project(db, id, project_in)
-    return {
-        "success": True,
-        "data": project
-    }
+    return {"success": True, "data": project}
 
 
 @router.delete(
@@ -120,3 +118,64 @@ def delete_project(
     current_user: User = Depends(require_admin),
 ):
     ProjectService.delete_project(db, id)
+
+
+@router.post(
+    "/{id}/members",
+    status_code=status.HTTP_201_CREATED,
+    summary="Loyihaga talaba biriktirish (Faqat muharrirlar)",
+)
+def add_project_member(
+    id: UUID,
+    member_in: ProjectMemberAddSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    member = ProjectService.add_member(
+        db=db,
+        project_id=id,
+        student_id=member_in.student_id,
+        is_leader=member_in.is_leader,
+        changed_by=cast(UUID, current_user.id),
+    )
+    return {"success": True, "data": member}
+
+
+@router.delete(
+    "/{id}/members/{student_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Talabani loyihadan olib tashlash (Faqat muharrirlar)",
+)
+def remove_project_member(
+    id: UUID,
+    student_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    ProjectService.remove_member(
+        db=db,
+        project_id=id,
+        student_id=student_id,
+        changed_by=cast(UUID, current_user.id),
+    )
+
+
+@router.patch(
+    "/{id}/members/{student_id}/move",
+    summary="Talabani boshqa loyihaga ko'chirish (Drag & Drop, Faqat muharrirlar)",
+)
+def move_project_member(
+    id: UUID,
+    student_id: UUID,
+    move_in: ProjectMemberMoveSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    member = ProjectService.move_member(
+        db=db,
+        project_id=id,
+        student_id=student_id,
+        target_project_id=move_in.target_project_id,
+        changed_by=cast(UUID, current_user.id),
+    )
+    return {"success": True, "data": member}
