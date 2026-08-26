@@ -7,6 +7,7 @@ from fastapi import HTTPException, status
 
 # pyrefly: ignore [missing-import]
 from sqlalchemy import func
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
 from src.models.project_history import ProjectHistory
@@ -82,34 +83,82 @@ class ProjectService:
         data = project_data.model_dump()
         data["created_by"] = user_id
 
-        return ProjectRepository.create(db, data)
+        new_project = ProjectRepository.create(db, data)
+        db.add(
+            ProjectHistory(
+                project_id=new_project.id,
+                changed_by=user_id,
+                change_type="created",
+                description="Loyiha yaratildi",
+            )
+        )
+        db.commit()
+        db.refresh(new_project)
+        return new_project
 
     @staticmethod
     def update_project(
         db: Session,
         project_id: UUID,
         project_data: ProjectUpdateSchema,
+        user_id: UUID,
     ) -> Project:
         project = ProjectService.get_project(db, project_id)
         update_data = project_data.model_dump(exclude_unset=True)
 
+        changes = []
         if "name" in update_data and update_data["name"] != project.name:
             ProjectService._ensure_unique(
                 db, update_data["name"], UUID(str(project.id))
             )
+            changes.append("nomi")
+
+        if "status" in update_data and update_data["status"] != project.status:
+            changes.append("holati")
+
+        if "category" in update_data and update_data["category"] != project.category:
+            changes.append("kategoriyasi")
 
         if (
             "leader_student_id" in update_data
             and update_data["leader_student_id"] != project.leader_student_id
         ):
             ProjectService._check_leader_exists(db, update_data["leader_student_id"])
+            changes.append("rahbari")
 
-        return ProjectRepository.update(db, project, update_data)
+        updated_project = ProjectRepository.update(db, project, update_data)
+        
+        if changes:
+            desc = f"Loyiha {', '.join(changes)} o'zgartirildi"
+            db.add(
+                ProjectHistory(
+                    project_id=updated_project.id,
+                    changed_by=user_id,
+                    change_type="updated",
+                    description=desc,
+                )
+            )
+            db.commit()
+            db.refresh(updated_project)
+
+        return updated_project
 
     @staticmethod
     def delete_project(db: Session, project_id: UUID) -> None:
         project = ProjectService.get_project(db, project_id)
         ProjectRepository.delete(db, project)
+
+    @staticmethod
+    def get_project_history(db: Session, project_id: UUID) -> List[ProjectHistory]:
+        # Loyiha mavjudligini tekshirish
+        ProjectService.get_project(db, project_id)
+        
+        return (
+            db.query(ProjectHistory)
+            .filter(ProjectHistory.project_id == project_id)
+            .order_by(ProjectHistory.created_at.desc())
+            .all()
+        )
 
     @staticmethod
     def _get_active_member_count(db: Session, project_id: UUID) -> int:

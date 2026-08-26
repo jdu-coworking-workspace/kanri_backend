@@ -1,4 +1,4 @@
-from typing import Optional, cast
+from typing import Optional, cast, List
 from uuid import UUID
 
 # pyrefly: ignore [missing-import]
@@ -17,6 +17,7 @@ from src.schemas.project import (
     ProjectMemberMoveSchema,
     ProjectUpdateSchema,
     ProjectListOutSchema,
+    ProjectHistoryOutSchema,
 )
 from src.services.project_service import ProjectService
 
@@ -82,7 +83,7 @@ def get_project(
 @router.post(
     "/",
     status_code=status.HTTP_201_CREATED,
-    summary="Yangi loyiha yaratish (Faqat muharrirlar)",
+    summary="Yangi loyiha yaratish (Faqat adminlar)",
 )
 def create_project(
     project_in: ProjectCreateSchema,
@@ -95,7 +96,7 @@ def create_project(
 
 @router.put(
     "/{id}",
-    summary="Loyihani tahrirlash (Faqat muharrirlar)",
+    summary="Loyihani tahrirlash (Faqat adminlar)",
 )
 def update_project(
     id: UUID,
@@ -103,14 +104,16 @@ def update_project(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    project = ProjectService.update_project(db, id, project_in)
+    project = ProjectService.update_project(
+        db, id, project_in, cast(UUID, current_user.id)
+    )
     return {"success": True, "data": project}
 
 
 @router.delete(
     "/{id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Loyihani o'chirish (Faqat muharrirlar)",
+    summary="Loyihani o'chirish (Faqat adminlar)",
 )
 def delete_project(
     id: UUID,
@@ -120,10 +123,23 @@ def delete_project(
     ProjectService.delete_project(db, id)
 
 
+@router.get(
+    "/{id}/history",
+    summary="Bitta loyiha tarixini olish",
+)
+def get_project_history(
+    id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    history = ProjectService.get_project_history(db, id)
+    return {"success": True, "data": history}
+
+
 @router.post(
     "/{id}/members",
     status_code=status.HTTP_201_CREATED,
-    summary="Loyihaga talaba biriktirish (Faqat muharrirlar)",
+    summary="Loyihaga talaba biriktirish (Faqat adminlar)",
 )
 def add_project_member(
     id: UUID,
@@ -144,7 +160,7 @@ def add_project_member(
 @router.delete(
     "/{id}/members/{student_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Talabani loyihadan olib tashlash (Faqat muharrirlar)",
+    summary="Talabani loyihadan olib tashlash (Faqat adminlar)",
 )
 def remove_project_member(
     id: UUID,
@@ -162,7 +178,7 @@ def remove_project_member(
 
 @router.patch(
     "/{id}/members/{student_id}/move",
-    summary="Talabani boshqa loyihaga ko'chirish (Drag & Drop, Faqat muharrirlar)",
+    summary="Talabani boshqa loyihaga ko'chirish (Drag & Drop, Faqat adminlar)",
 )
 def move_project_member(
     id: UUID,

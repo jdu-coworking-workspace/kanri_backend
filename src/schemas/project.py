@@ -73,3 +73,15 @@ class ProjectMemberMoveSchema(BaseModel):
     target_project_id: UUID = Field(
         ..., description="Talaba ko'chiriladigan loyiha ID si"
     )
+
+
+class ProjectHistoryOutSchema(BaseModel):
+    id: UUID
+    project_id: UUID
+    changed_by: UUID
+    change_type: str
+    description: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

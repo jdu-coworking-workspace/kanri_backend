@@ -3,6 +3,9 @@ annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.14.2
 bcrypt==5.0.0
+boto3==1.43.80
+botocore==1.43.80
+s3transfer==0.19.2
 cffi==2.1.0
 click==8.4.2
 cryptography==50.0.0
