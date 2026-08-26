@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from typing import Optional, List
 from uuid import UUID
+
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 
@@ -15,7 +16,9 @@ class ProjectBaseSchema(BaseModel):
     end_date: Optional[date] = Field(None, description="Loyiha tugash sanasi")
     status: ProjectStatus = Field(ProjectStatus.PLANNED, description="Loyiha holati")
     category: ProjectCategory = Field(..., description="Loyiha kategoriyasi")
-    leader_student_id: Optional[UUID] = Field(None, description="Loyiha rahbari (Student ID)")
+    leader_student_id: Optional[UUID] = Field(
+        None, description="Loyiha rahbari (Student ID)"
+    )
 
 
 class ProjectCreateSchema(ProjectBaseSchema):
@@ -38,7 +41,7 @@ class ProjectMemberSimpleSchema(BaseModel):
     is_leader: bool
     joined_at: datetime
     left_at: Optional[datetime] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -59,3 +62,26 @@ class ProjectListOutSchema(BaseModel):
     success: bool = True
     data: List[ProjectOutSchema]
     meta: dict
+
+
+class ProjectMemberAddSchema(BaseModel):
+    student_id: UUID = Field(..., description="Loyihaga qo'shiladigan talaba ID si")
+    is_leader: bool = Field(False, description="Loyiha rahbari sifatida belgilash")
+
+
+class ProjectMemberMoveSchema(BaseModel):
+    target_project_id: UUID = Field(
+        ..., description="Talaba ko'chiriladigan loyiha ID si"
+    )
+
+
+class ProjectHistoryOutSchema(BaseModel):
+    id: UUID
+    project_id: UUID
+    changed_by: UUID
+    change_type: str
+    description: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
