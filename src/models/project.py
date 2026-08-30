@@ -14,11 +14,10 @@ class ProjectStatus(str, Enum):
     CANCELLED = "cancelled"
     
 class ProjectCategory(str, Enum):
+    TRIAL = "trial"
     IT = "it"
     VIDEO = "video"
     LIGHT_WORK = "light_work"
-    COWORK = "cowork" 
-    TRIAL = "trial"   
 
 
 

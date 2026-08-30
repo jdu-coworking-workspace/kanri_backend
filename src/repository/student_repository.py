@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import or_
 
 # pyrefly: ignore [missing-import]
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 # pyrefly: ignore [missing-import]
 from src.models.project_member import ProjectMember
 
@@ -33,7 +33,7 @@ class StudentRepository:
         limit: int,
         q: Optional[str] = None,
     ) -> Tuple[List[Student], int]:
-        query = db.query(Student)
+        query = db.query(Student).options(selectinload(Student.project_memberships))
 
         if q:
             search = f"%{q}%"
