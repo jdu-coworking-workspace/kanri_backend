@@ -1,3 +1,11 @@
+# pyrefly: ignore [missing-import]
+import bcrypt
+# passlib bcrypt __about__ version compatibility patch
+if not hasattr(bcrypt, "__about__"):
+    class About:
+        __version__ = bcrypt.__version__
+    bcrypt.__about__ = About()
+
 from datetime import datetime, timedelta
 from typing import Any, Union, Optional
 from jose import jwt, JWTError

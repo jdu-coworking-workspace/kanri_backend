@@ -211,7 +211,7 @@ class TestProjectModel:
 
     def test_project_category_enum_values(self):
         values = {c.value for c in ProjectCategory}
-        assert values == {"it", "video", "light_work", "cowork", "trial"}
+        assert values == {"trial", "it", "video", "light_work"}
 
     def test_project_create_and_read(self, test_db, admin_user):
         """Project DB'ga yoziladi va o'qiladi."""

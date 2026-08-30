@@ -52,6 +52,7 @@ class StudentOutSchema(StudentBaseSchema):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    concurrent_projects_count: Optional[int] = 0
 
     class Config:
         from_attributes = True
