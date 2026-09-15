@@ -12,6 +12,35 @@ from src.config import settings
 
 router = APIRouter()
 
+
+def _cookie_secure() -> bool:
+    if settings.COOKIE_SECURE is None:
+        return settings.APP_ENV == "production"
+    return settings.COOKIE_SECURE
+
+
+def _set_auth_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=settings.COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=_cookie_secure(),
+        samesite=settings.COOKIE_SAMESITE,
+        max_age=settings.JWT_EXPIRES_MINUTES * 60,
+        path="/",
+    )
+
+
+def _clear_auth_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=settings.COOKIE_NAME,
+        httponly=True,
+        secure=_cookie_secure(),
+        samesite=settings.COOKIE_SAMESITE,
+        path="/",
+    )
+
+
 @router.post("/login")
 def login(
     login_data: LoginRequest,
@@ -19,16 +48,7 @@ def login(
     db: Session = Depends(get_db)
 ):
     user, token = authenticate_user(db, login_data)
-
-    response.set_cookie(
-        key=settings.COOKIE_NAME,
-        value=token,
-        httponly=True,
-        secure=(settings.APP_ENV == "production"),
-        samesite="lax",
-        max_age=settings.JWT_EXPIRES_MINUTES * 60,
-        path="/"
-    )
+    _set_auth_cookie(response, token)
 
     return {
         "success": True,
@@ -43,10 +63,7 @@ def logout(
     response: Response,
     current_user: User = Depends(get_current_user)
 ):
-    response.delete_cookie(
-        key=settings.COOKIE_NAME,
-        path="/"
-    )
+    _clear_auth_cookie(response)
 
     return {
         "success": True

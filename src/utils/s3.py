@@ -75,20 +75,23 @@ def _delete_from_local(avatar_url: str) -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _get_s3_client():
-    if not settings.AWS_ACCESS_KEY_ID or not settings.AWS_S3_BUCKET_NAME:
+    if not settings.AWS_S3_BUCKET_NAME:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
                 "code": "S3_NOT_CONFIGURED",
-                "message": "AWS S3 sozlamalari (AWS_ACCESS_KEY_ID, AWS_S3_BUCKET_NAME) to'ldirilmagan",
+                "message": "AWS_S3_BUCKET_NAME to'ldirilmagan",
             },
         )
-    return boto3.client(
-        "s3",
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name=settings.AWS_REGION,
-    )
+
+    # Kalitlar berilmasa boto3 ularni EC2 instance role dan oladi.
+    # Productionda kalit saqlamaymiz — faqat lokal ishlab chiqishda kerak.
+    kwargs = {"region_name": settings.AWS_REGION}
+    if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
+        kwargs["aws_access_key_id"] = settings.AWS_ACCESS_KEY_ID
+        kwargs["aws_secret_access_key"] = settings.AWS_SECRET_ACCESS_KEY
+
+    return boto3.client("s3", **kwargs)
 
 
 def _upload_to_s3(file_bytes: bytes, content_type: str, student_id: str) -> str:
@@ -122,12 +125,7 @@ def _delete_from_s3(avatar_url: str) -> None:
     key = _extract_s3_key(avatar_url)
     if not key:
         return
-    s3 = boto3.client(
-        "s3",
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-        region_name=settings.AWS_REGION,
-    )
+    s3 = _get_s3_client()
     s3.delete_object(Bucket=settings.AWS_S3_BUCKET_NAME, Key=key)
 
 
