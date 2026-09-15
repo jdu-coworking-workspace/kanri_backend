@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRES_MINUTES: int = 1440
     COOKIE_NAME: str = "access_token"
+    # None bo'lsa APP_ENV=production da Secure cookie yoqiladi.
+    # HTTPS (Nginx) ortida true. Faqat HTTP demo uchun false.
+    COOKIE_SECURE: Optional[bool] = None
+    COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
     CORS_ORIGIN: str
 
     # Storage mode: "local" yoki "production"
