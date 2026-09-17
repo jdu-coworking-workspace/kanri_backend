@@ -36,4 +36,5 @@ def root():
     return {"message": "Cowork API is running"}
 
 
-app.include_router(api_router, prefix="/api/v1")
+# Statistics router enabled
+app.include_router(api_router, prefix="/api/v1")

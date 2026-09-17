@@ -8,7 +8,7 @@ from .base import Base, TimeStampsMixin, generate_uuid
 
 class UserRole(str, Enum):
     STAFF = "staff"
-    ADMIN = "admin"
+    ADMIN = "ADMIN"
 
 
 class User(Base, TimeStampsMixin):
