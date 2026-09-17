@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query, status
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
+from src.models.student import SemesterEnum, SkillRank, WorkStatus
 from src.database.session import get_db
 from src.api.deps import get_current_user, require_admin
 from src.models.user import User
@@ -46,10 +47,21 @@ def get_students(
     q: Optional[str] = Query(
         None, description="full_name, kana_name yoki student_code bo'yicha qidiruv"
     ),
+    skill_rank: Optional[SkillRank] = Query(
+        None, description="Skill rank bo'yicha filter"
+    ),
+    work_status: Optional[WorkStatus] = Query(
+        None, description="Work status bo'yicha filter"
+    ),
+    semester: Optional[SemesterEnum] = Query(
+        None, description="Semestr bo'yicha filter"
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    items, total = StudentService.get_students(db, page, limit, q)
+    items, total = StudentService.get_students(
+        db, page, limit, q, skill_rank, work_status, semester
+    )
     total_pages = ceil(total / limit) if total > 0 else 1
     return {
         "success": True,

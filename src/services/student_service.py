@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
-from src.models.student import Student
+from src.models.student import SemesterEnum, SkillRank, Student, WorkStatus
 from src.repository.student_repository import StudentRepository
 from src.schemas.student import (
     StudentCreateSchema,
@@ -34,12 +34,17 @@ class StudentService:
         page: int,
         limit: int,
         q: Optional[str] = None,
+        skill_rank: Optional[SkillRank] = None,
+        work_status: Optional[WorkStatus] = None,
+        semester: Optional[SemesterEnum] = None,
     ) -> Tuple[List[Student], int]:
         if page < 1:
             page = 1
         if limit < 1:
             limit = 10
-        return StudentRepository.get_list(db, page, limit, q)
+        return StudentRepository.get_list(
+            db, page, limit, q, skill_rank, work_status, semester
+        )
 
     @staticmethod
     def _ensure_unique(

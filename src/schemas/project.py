@@ -19,6 +19,9 @@ class ProjectBaseSchema(BaseModel):
     leader_student_id: Optional[UUID] = Field(
         None, description="Loyiha rahbari (Student ID)"
     )
+    description: Optional[str] = Field(
+        None, description="Loyiha haqida batafsil ma'lumot"
+    )
 
 
 class ProjectCreateSchema(ProjectBaseSchema):
