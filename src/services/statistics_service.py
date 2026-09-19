@@ -309,14 +309,13 @@ class StatisticsService:
                 extract('month', Project.updated_at) == mn
             ).count()
 
-            # Provide graceful fallbacks if data is sparse in local SQLite
             monthly_trends.append(
                 MonthlyTrendItemSchema(
                     month=m_str,
                     month_label=m_label,
-                    new_students=st_cnt if st_cnt > 0 else (yr * 2 + mn) % 7 + 2,
-                    created_projects=p_created if p_created > 0 else (mn % 3) + 1,
-                    completed_projects=p_done if p_done > 0 else (mn % 2)
+                    new_students=st_cnt,
+                    created_projects=p_created,
+                    completed_projects=p_done
                 )
             )
 
