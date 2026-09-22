@@ -132,7 +132,7 @@ class TestStudentModel:
         expected = {
             "id", "full_name", "kana_name", "student_code", "email",
             "avatar_url", "semester", "skill_rank", "work_status",
-            "grad_year_month", "point_1", "point_2", "point_3",
+            "grad_year_month",
             "created_at", "updated_at",
         }
         assert expected.issubset(cols)
@@ -163,7 +163,6 @@ class TestStudentModel:
             work_status=WorkStatus.ACTIVE,
             semester=SemesterEnum.SEMESTER_4,
             grad_year_month=date(2026, 6, 1),
-            point_1=10, point_2=20, point_3=30,
         )
         test_db.add(student)
         test_db.commit()
@@ -175,7 +174,6 @@ class TestStudentModel:
         assert fetched is not None
         assert fetched.full_name == "Karimova Nilufar"
         assert fetched.skill_rank == SkillRank.S
-        assert fetched.point_1 == 10
 
     def test_student_code_unique_constraint(self, test_db):
         """Bir xil student_code ikki marta qo'shilsa xato."""

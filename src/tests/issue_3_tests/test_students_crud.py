@@ -319,13 +319,11 @@ class TestCreateStudent:
             "work_status": "active",
             "semester": "4-semestr",
             "grad_year_month": "2026-06-01",
-            "point_1": 10, "point_2": 20, "point_3": 30,
         })
         resp = client.post("/api/v1/students", json=payload)
         assert resp.status_code == 201
         data = resp.json()["data"]
         assert data["skill_rank"] == "S"
-        assert data["point_1"] == 10
 
     def test_create_duplicate_student_code_returns_409(self, client, admin_cookie):
         """Duplicate student_code → 409."""

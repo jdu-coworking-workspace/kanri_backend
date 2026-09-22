@@ -124,9 +124,6 @@ class StudentService:
             "semester": source.semester,
             "skill_rank": source.skill_rank,
             "work_status": source.work_status,
-            "point_1": source.point_1,
-            "point_2": source.point_2,
-            "point_3": source.point_3,
         }
 
         return StudentRepository.create(db, new_data)
