@@ -38,7 +38,7 @@ class UserService:
         new_user_data = {
             "email": user_data.email,
             "full_name": user_data.full_name,
-            "role": user_data.role,
+            "role": UserRole.parse(user_data.role),
             "password_hash": get_password_hash(user_data.password)
         }
         

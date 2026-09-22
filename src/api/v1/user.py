@@ -11,6 +11,7 @@ from src.schemas.user import (
     UserCreateSchema,
     UserRoleUpdateSchema,
     UserListOutSchema,
+    UserSingleOutSchema,
 )
 from src.services.user_service import UserService
 
@@ -36,6 +37,7 @@ def get_users(
 @router.post(
     "/",
     status_code=status.HTTP_201_CREATED,
+    response_model=UserSingleOutSchema,
     summary="Yangi xodim qo'shish (Faqat admin)",
 )
 def create_user(
@@ -52,6 +54,7 @@ def create_user(
 
 @router.put(
     "/{id}/role",
+    response_model=UserSingleOutSchema,
     summary="Xodimning rolini o'zgartirish (Faqat admin)",
 )
 def update_user_role(

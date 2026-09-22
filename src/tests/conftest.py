@@ -24,6 +24,7 @@ from sqlalchemy.orm import sessionmaker
 from src.main import app
 # Barcha modellarni import — Base.metadata'ga ro'yxatdan o'tkazish uchun
 from src.models import User, Student, Project, ProjectMember, ProjectHistory  # noqa: F401
+from src.models.user import UserRole
 from src.models.base import Base
 from src.database.session import get_db
 from src.utils.security import get_password_hash
@@ -98,7 +99,7 @@ def admin_user(test_db) -> User:
         email="admin@test.com",
         password_hash=get_password_hash("secret123"),
         full_name="Admin Xodim",
-        role="admin",
+        role=UserRole.ADMIN,
     )
     test_db.add(user)
     test_db.commit()
@@ -113,7 +114,7 @@ def staff_user(test_db) -> User:
         email="staff@test.com",
         password_hash=get_password_hash("secret123"),
         full_name="Staff Xodim",
-        role="staff",
+        role=UserRole.STAFF,
     )
     test_db.add(user)
     test_db.commit()

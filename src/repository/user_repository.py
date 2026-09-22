@@ -1,6 +1,6 @@
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
-from src.models.user import User
+from src.models.user import User, UserRole
 
 import uuid
 
@@ -20,14 +20,17 @@ def get_users(db: Session) -> list[User]:
     return db.query(User).order_by(User.created_at.desc()).all()
 
 def create_user(db: Session, user_data: dict) -> User:
-    user = User(**user_data)
+    payload = dict(user_data)
+    if "role" in payload:
+        payload["role"] = UserRole.parse(payload["role"])
+    user = User(**payload)
     db.add(user)
     db.commit()
     db.refresh(user)
     return user
 
-def update_user_role(db: Session, user: User, role: str) -> User:
-    user.role = role
+def update_user_role(db: Session, user: User, role: str | UserRole) -> User:
+    user.role = UserRole.parse(role)
     db.commit()
     db.refresh(user)
     return user

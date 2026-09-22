@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from src.schemas.auth import LoginRequest
 from src.repository import user_repository
+from src.models.user import UserRole
 from src.utils.security import verify_password, create_access_token
 
 def authenticate_user(db: Session, login_data: LoginRequest):
@@ -21,7 +22,10 @@ def authenticate_user(db: Session, login_data: LoginRequest):
             detail="Email yoki parol noto'g'ri"
         )
     
-    token = create_access_token(subject=user.id, role=user.role.value)
+    token = create_access_token(
+        subject=user.id,
+        role=UserRole.parse(user.role).value,
+    )
 
     return user, token
 
