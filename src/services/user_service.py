@@ -28,6 +28,13 @@ class UserService:
 
     @staticmethod
     def create_user(db: Session, user_data: UserCreateSchema) -> User:
+        role = UserRole.parse(user_data.role)
+        if role is UserRole.STUDENT:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Student akkaunti faqat talaba yaratish orqali ochiladi",
+            )
+
         existing = user_repository.get_user_by_email(db, user_data.email)
         if existing:
             raise HTTPException(
@@ -38,7 +45,7 @@ class UserService:
         new_user_data = {
             "email": user_data.email,
             "full_name": user_data.full_name,
-            "role": UserRole.parse(user_data.role),
+            "role": role,
             "password_hash": get_password_hash(user_data.password)
         }
         
@@ -46,8 +53,19 @@ class UserService:
 
     @staticmethod
     def update_role(db: Session, user_id: UUID, role_data: UserRoleUpdateSchema) -> User:
+        role = UserRole.parse(role_data.role)
+        if role is UserRole.STUDENT:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Student akkaunti faqat talaba yaratish orqali ochiladi",
+            )
         user = UserService.get_user(db, user_id)
-        return user_repository.update_user_role(db, user, role_data.role)
+        if user.is_student:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Student rolini bu yerda o'zgartirib bo'lmaydi",
+            )
+        return user_repository.update_user_role(db, user, role)
 
     @staticmethod
     def delete_user(db: Session, user_id: UUID, current_user_id: UUID) -> None:

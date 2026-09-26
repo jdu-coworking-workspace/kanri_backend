@@ -17,7 +17,12 @@ def get_user_by_id(db: Session, user_id: str | uuid.UUID) -> User | None:
 
 
 def get_users(db: Session) -> list[User]:
-    return db.query(User).order_by(User.created_at.desc()).all()
+    return (
+        db.query(User)
+        .filter(User.role != UserRole.STUDENT)
+        .order_by(User.created_at.desc())
+        .all()
+    )
 
 def create_user(db: Session, user_data: dict) -> User:
     payload = dict(user_data)
@@ -28,6 +33,13 @@ def create_user(db: Session, user_data: dict) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+def update_password(db: Session, user: User, password_hash: str) -> User:
+    user.password_hash = password_hash
+    db.commit()
+    db.refresh(user)
+    return user
+
 
 def update_user_role(db: Session, user: User, role: str | UserRole) -> User:
     user.role = UserRole.parse(role)

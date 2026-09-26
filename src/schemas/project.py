@@ -36,6 +36,7 @@ class ProjectUpdateSchema(BaseModel):
     status: Optional[ProjectStatus] = None
     category: Optional[ProjectCategory] = None
     leader_student_id: Optional[UUID] = None
+    description: Optional[str] = None
 
 
 class ProjectMemberSimpleSchema(BaseModel):

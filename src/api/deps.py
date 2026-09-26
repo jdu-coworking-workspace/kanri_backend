@@ -10,7 +10,7 @@ from src.database.session import get_db
 # pyrefly: ignore [missing-import]
 from src.utils.security import decode_access_token
 from src.repository import user_repository
-from src.models.user import User
+from src.models.user import User, UserRole
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
@@ -51,5 +51,14 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sizda bu amalni bajarish uchun ruxsat yo'q (Faqat admin uchun)",
+        )
+    return current_user
+
+
+def require_staff_or_admin(current_user: User = Depends(get_current_user)) -> User:
+    if UserRole.parse(current_user.role) is UserRole.STUDENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sizda bu sahifaga kirish huquqi yo'q",
         )
     return current_user

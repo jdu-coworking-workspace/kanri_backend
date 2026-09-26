@@ -1,6 +1,6 @@
 from enum import Enum
 # pyrefly: ignore [missing-import]
-from sqlalchemy import Column, String, Date, Enum as SQLEnum
+from sqlalchemy import Column, String, Date, ForeignKey, Enum as SQLEnum
 # pyrefly: ignore [missing-import]
 from sqlalchemy.dialects.postgresql import UUID
 # pyrefly: ignore [missing-import]
@@ -39,6 +39,12 @@ class Student(Base, TimeStampsMixin):
     kana_name = Column(String(255), nullable=False, index=True)
     student_code = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(255), unique=True, nullable=False)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        unique=True,
+        nullable=True,
+    )
     avatar_url = Column(String(500), nullable=True)
     grad_year_month = Column(Date, nullable=True)
 
@@ -51,6 +57,7 @@ class Student(Base, TimeStampsMixin):
     # point_2 = Column(Integer, default=0)
     # point_3 = Column(Integer, default=0)
 
+    user = relationship("User")
     project_memberships = relationship("ProjectMember", back_populates="student", cascade="all, delete-orphan")
 
     @property

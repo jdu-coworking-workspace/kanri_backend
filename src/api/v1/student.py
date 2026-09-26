@@ -75,6 +75,16 @@ def get_students(
     }
 
 
+# ─── GET /students/me ─────────────────────────────────────────────────────────
+@router.get("/me")
+def get_own_student(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    student = StudentService.get_own_profile(db, current_user)
+    return {"success": True, "data": StudentOutSchema.model_validate(student)}
+
+
 # ─── GET /students/{student_id}/history ───────────────────────────────────────
 # NOTE: Bu route /{student_id} dan OLDIN joylashtirilishi shart emas (ikki segment
 # vs bir segment), lekin o'qish qulayligi uchun oldin yozildi.

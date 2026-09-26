@@ -150,6 +150,52 @@ class TestGetStudentsList:
         resp = client.get("/api/v1/students")
         assert resp.status_code == 200
 
+    def test_get_students_student_can_access(self, client, student_cookie, sample_student):
+        """Talaba loyiha kartalarini to'ldirish uchun ro'yxatni ko'ra oladi."""
+        client.cookies.set("access_token", student_cookie)
+        resp = client.get("/api/v1/students")
+        assert resp.status_code == 200
+
+
+class TestOwnStudentProfile:
+
+    def test_student_can_read_own_profile(self, client, student_cookie, student_user, sample_student, test_db):
+        sample_student.user_id = student_user.id
+        test_db.commit()
+        client.cookies.set("access_token", student_cookie)
+        resp = client.get("/api/v1/students/me")
+        assert resp.status_code == 200
+        assert resp.json()["data"]["student_code"] == sample_student.student_code
+
+    def test_staff_cannot_read_own_student_profile(self, client, staff_cookie):
+        client.cookies.set("access_token", staff_cookie)
+        resp = client.get("/api/v1/students/me")
+        assert resp.status_code == 403
+
+    def test_student_can_upload_own_avatar(self, client, student_cookie, student_user, sample_student, test_db):
+        import base64
+
+        sample_student.user_id = student_user.id
+        test_db.commit()
+        png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        )
+        client.cookies.set("access_token", student_cookie)
+        resp = client.post(
+            "/api/v1/uploads/me/avatar",
+            files={"file": ("avatar.png", png, "image/png")},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["data"]["file_url"].startswith("/media/avatars/")
+
+    def test_staff_cannot_upload_own_avatar(self, client, staff_cookie):
+        client.cookies.set("access_token", staff_cookie)
+        resp = client.post(
+            "/api/v1/uploads/me/avatar",
+            files={"file": ("avatar.png", b"not-an-image", "image/png")},
+        )
+        assert resp.status_code == 403
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 2. GET /students/{id} — BATAFSIL

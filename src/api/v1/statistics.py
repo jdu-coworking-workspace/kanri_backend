@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from src.database.session import get_db
-from src.api.deps import get_current_user
+from src.api.deps import require_staff_or_admin
 from src.models.user import User
 from src.schemas.statistics import StatisticsSummarySchema
 from src.services.statistics_service import StatisticsService
@@ -21,7 +21,7 @@ def get_statistics_summary(
     category_filter: Optional[str] = Query(
         None, description="Category filter: all, it, video, light_work, trial"
     ),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_staff_or_admin),
     db: Session = Depends(get_db),
 ):
     """

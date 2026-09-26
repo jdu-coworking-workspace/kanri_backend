@@ -3,7 +3,7 @@ from typing import Annotated
 from uuid import UUID
 
 # pyrefly: ignore [missing-import]
-from pydantic import BaseModel, BeforeValidator, EmailStr, PlainSerializer
+from pydantic import BaseModel, BeforeValidator, EmailStr, Field, PlainSerializer
 
 from src.models.user import UserRole
 
@@ -25,6 +25,11 @@ ApiUserRole = Annotated[
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=6)
 
 
 class UserOut(BaseModel):

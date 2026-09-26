@@ -54,9 +54,10 @@ class TestUserModel:
 
     def test_user_role_api_values_are_lowercase(self):
         """API shartnomasi: role qiymatlari doim kichik harf."""
-        assert {role.value for role in UserRole} == {"staff", "admin"}
+        assert {role.value for role in UserRole} == {"staff", "admin", "student"}
         assert UserRole.ADMIN.value == "admin"
         assert UserRole.STAFF.value == "staff"
+        assert UserRole.STUDENT.value == "student"
 
     def test_user_role_parse_accepts_any_case(self):
         """DB name (ADMIN) va API value (admin) bir xil memberga aylanadi."""
@@ -65,6 +66,8 @@ class TestUserModel:
         assert UserRole.parse("Admin") is UserRole.ADMIN
         assert UserRole.parse("staff") is UserRole.STAFF
         assert UserRole.parse("STAFF") is UserRole.STAFF
+        assert UserRole.parse("student") is UserRole.STUDENT
+        assert UserRole.parse("STUDENT") is UserRole.STUDENT
         assert UserRole.parse(UserRole.ADMIN) is UserRole.ADMIN
         assert UserRole("ADMIN") is UserRole.ADMIN
 

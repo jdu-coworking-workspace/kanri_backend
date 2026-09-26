@@ -24,6 +24,10 @@ class StudentRepository:
         return db.query(Student).filter(Student.student_code == student_code).first()
 
     @staticmethod
+    def get_by_user_id(db: Session, user_id: UUID) -> Optional[Student]:
+        return db.query(Student).filter(Student.user_id == user_id).first()
+
+    @staticmethod
     def get_by_email(db: Session, email: str) -> Optional[Student]:
         return db.query(Student).filter(Student.email == email).first()
 

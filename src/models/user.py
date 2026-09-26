@@ -7,16 +7,17 @@ from .base import Base, TimeStampsMixin, generate_uuid
 
 
 class UserRole(str, Enum):
-    """API/JWT qiymatlari kichik harf: staff, admin.
+    """API/JWT qiymatlari kichik harf: staff, admin, student.
 
     PostgreSQL `userrole` enum esa Alembic migratsiyasida
-    STAFF/ADMIN (enum name) sifatida yaratilgan. SQLAlchemy
+    STAFF/ADMIN/STUDENT (enum name) sifatida yaratilgan. SQLAlchemy
     `values_callable` shu nomlarni saqlaydi, Python/JSON esa
     `.value` ni qaytaradi.
     """
 
     STAFF = "staff"
     ADMIN = "admin"
+    STUDENT = "student"
 
     @classmethod
     def try_parse(cls, value):
@@ -67,3 +68,7 @@ class User(Base, TimeStampsMixin):
     @property
     def is_admin(self) -> bool:
         return UserRole.parse(self.role) is UserRole.ADMIN
+
+    @property
+    def is_student(self) -> bool:
+        return UserRole.parse(self.role) is UserRole.STUDENT

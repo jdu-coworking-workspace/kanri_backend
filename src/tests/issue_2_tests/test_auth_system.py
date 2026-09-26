@@ -324,3 +324,37 @@ class TestRequireAdmin:
             json={"full_name": "A", "kana_name": "A", "student_code": "A001", "email": "a@t.com"},
         )
         assert resp.status_code == 401
+
+
+class TestChangePassword:
+
+    def test_change_password_success(self, client, staff_cookie):
+        client.cookies.set("access_token", staff_cookie)
+        resp = client.post(
+            "/api/v1/auth/change-password",
+            json={"current_password": "secret123", "new_password": "newsecret1"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+        login = client.post(
+            "/api/v1/auth/login",
+            json={"email": "staff@test.com", "password": "newsecret1"},
+        )
+        assert login.status_code == 200
+
+    def test_change_password_wrong_current(self, client, admin_cookie):
+        client.cookies.set("access_token", admin_cookie)
+        resp = client.post(
+            "/api/v1/auth/change-password",
+            json={"current_password": "wrongpass", "new_password": "newsecret1"},
+        )
+        assert resp.status_code == 400
+        assert resp.json()["detail"]["code"] == "WRONG_CURRENT_PASSWORD"
+
+    def test_change_password_requires_auth(self, client):
+        resp = client.post(
+            "/api/v1/auth/change-password",
+            json={"current_password": "secret123", "new_password": "newsecret1"},
+        )
+        assert resp.status_code == 401
