@@ -9,6 +9,8 @@ from .project import Project
 from .project_member import ProjectMember
 # pyrefly: ignore [missing-import]
 from .project_history import ProjectHistory
+# pyrefly: ignore [missing-import]
+from .work_report import DailyReport, MonthlyReport
 
 __all__ = [
     "Base",
@@ -16,5 +18,7 @@ __all__ = [
     "Student",
     "Project",
     "ProjectMember",
-    "ProjectHistory"
+    "ProjectHistory",
+    "MonthlyReport",
+    "DailyReport",
 ]

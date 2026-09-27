@@ -15,7 +15,15 @@ import uuid
 import pytest
 from datetime import date, datetime
 
-from src.models import User, Student, Project, ProjectMember, ProjectHistory
+from src.models import (
+    User,
+    Student,
+    Project,
+    ProjectMember,
+    ProjectHistory,
+    MonthlyReport,
+    DailyReport,
+)
 from src.models.student import SkillRank, WorkStatus, SemesterEnum
 from src.models.project import ProjectStatus, ProjectCategory
 from src.models.user import UserRole
@@ -460,6 +468,7 @@ class TestModelsImport:
     def test_all_models_importable(self):
         from src.models import (  # noqa: F401
             Base, User, Student, Project, ProjectMember, ProjectHistory,
+            MonthlyReport, DailyReport,
         )
         assert True
 
@@ -468,4 +477,5 @@ class TestModelsImport:
         from src.models.base import Base
         table_names = set(Base.metadata.tables.keys())
         assert {"users", "students", "projects",
-                "project_members", "project_history"}.issubset(table_names)
+                "project_members", "project_history",
+                "monthly_reports", "daily_reports"}.issubset(table_names)

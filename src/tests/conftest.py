@@ -23,7 +23,15 @@ from sqlalchemy.orm import sessionmaker
 
 from src.main import app
 # Barcha modellarni import — Base.metadata'ga ro'yxatdan o'tkazish uchun
-from src.models import User, Student, Project, ProjectMember, ProjectHistory  # noqa: F401
+from src.models import (  # noqa: F401
+    User,
+    Student,
+    Project,
+    ProjectMember,
+    ProjectHistory,
+    MonthlyReport,
+    DailyReport,
+)
 from src.models.user import UserRole
 from src.models.base import Base
 from src.database.session import get_db
