@@ -1,7 +1,8 @@
 from uuid import UUID
 
 # pyrefly: ignore [missing-import]
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+# pyrefly: ignore [missing-import]
 from fastapi.responses import Response
 
 # pyrefly: ignore [missing-import]
@@ -13,6 +14,7 @@ from src.models.user import User
 from src.schemas.work_report import MonthlyReportUpdateIn, ReportReviewIn
 from src.services.work_report_service import WorkReportService
 from src.utils.report_excel import build_monthly_report_xlsx
+from src.utils.report_excel_batch import build_period_archive
 
 router = APIRouter()
 
@@ -74,6 +76,28 @@ def list_reports(
     return {"success": True, "data": WorkReportService.list_period(db, year, month)}
 
 
+# Declared before "/{report_id}" so the literal path wins over the UUID route.
+@router.get("/export")
+def export_period(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    reports = WorkReportService.list_period_exports(db, year, month)
+    if not reports:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "REPORT_EXPORT_EMPTY", "message": "Bu oy uchun hisobot topilmadi"},
+        )
+    content = build_period_archive(reports, year, month)
+    return Response(
+        content=content,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="reports_{year}-{month:02d}.zip"'},
+    )
+
+
 @router.get("/{report_id}")
 def get_report(
     report_id: UUID,
@@ -115,7 +139,7 @@ def export_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    report = WorkReportService.get_detail(db, report_id)
+    report = WorkReportService.get_export_detail(db, report_id)
     content = build_monthly_report_xlsx(report)
     filename = f"{report['student_code']}_{report['year']}-{report['month']:02d}.xlsx"
     return Response(

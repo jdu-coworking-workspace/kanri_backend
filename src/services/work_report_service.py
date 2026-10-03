@@ -392,6 +392,22 @@ class WorkReportService:
         return serialize_report(report)
 
     @staticmethod
+    def get_export_detail(db: Session, report_id: UUID) -> dict:
+        """Full report for Excel export. Unlike get_detail this also returns
+        drafts, so an admin can download a month that is still in progress."""
+        return serialize_report(WorkReportService._load(db, report_id))
+
+    @staticmethod
+    def list_period_exports(db: Session, year: int, month: int) -> list[dict]:
+        """Every existing report of one period, drafts included, ready for export."""
+        rows = WorkReportRepository.list_for_period(db, year, month)
+        return [
+            serialize_report(report)
+            for _student, report in rows
+            if report is not None
+        ]
+
+    @staticmethod
     def accept(db: Session, report_id: UUID, reviewer: User, payload: ReportReviewIn) -> dict:
         return WorkReportService._decide(db, report_id, reviewer, payload, ReportStatus.APPROVED, "accepted")
 
