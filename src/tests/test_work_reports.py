@@ -1,5 +1,5 @@
 import calendar
-from datetime import date
+from datetime import date, time
 from io import BytesIO
 
 import pytest
@@ -232,8 +232,16 @@ class TestWorkReports:
         sheet = workbook.active
         assert sheet["C3"].value == "UZ240001"
         assert sheet["C4"].value == "Karimova Nilufar"
-        assert sheet["C7"].value is None
+        assert sheet["B2"].value == "成果報告書（固定制）　勤務記録表"
+        assert sheet["E7"].value == "=D7-C7"
+        assert sheet["E38"].value == "=SUM(E7:E37)"
+        assert sheet["C7"].value.hour == 0 and sheet["C7"].value.minute == 0
         assert sheet["F7"].value == "休み"
+        assert sheet["C8"].value.hour == 13
+        assert sheet["D8"].value.hour == 16
+        assert sheet["C41"].value == "week one"
+        assert sheet["I41"].value == 24000
+        assert sheet["I47"].value == "承認"
 
         mailed = capsys.readouterr().out
         assert mailed.count("email jonatilindi") == 2
@@ -263,3 +271,116 @@ class TestWorkReports:
         )
         assert row["report_id"] is None
         assert row["status"] is None
+
+
+class TestSeikaHoukokushoExcel:
+    def test_fills_official_template_layout(self):
+        from src.utils.report_excel import build_monthly_report_xlsx
+
+        year, month = 2026, 2
+        last_day = calendar.monthrange(year, month)[1]
+        days = []
+        for day in range(1, last_day + 1):
+            work_date = date(year, month, day).isoformat()
+            if day == 1:
+                days.append({"work_date": work_date, "is_day_off": True})
+            else:
+                days.append(
+                    {
+                        "work_date": work_date,
+                        "is_day_off": False,
+                        "start_time": "09:00",
+                        "finish_time": "12:00",
+                        "description": "work",
+                    }
+                )
+        content = build_monthly_report_xlsx(
+            {
+                "year": year,
+                "month": month,
+                "student_code": "2323123",
+                "student_name": "武座",
+                "status": "submitted",
+                "stipend_amount": None,
+                "week_2": "second week",
+                "days": days,
+            }
+        )
+        sheet = load_workbook(BytesIO(content)).active
+        assert sheet["B2"].value == "成果報告書（固定制）　勤務記録表"
+        assert sheet["C3"].value == "2323123"
+        assert sheet["C4"].value == "武座"
+        assert sheet["B6"].value == "日付"
+        assert sheet["B7"].value.date() == date(year, month, 1)
+        assert sheet["B34"].value.date() == date(year, month, 28)
+        assert sheet["B35"].value is None
+        assert sheet["F7"].value == "休み"
+        assert sheet["C8"].value.hour == 9
+        assert sheet["F8"].value == "work"
+        assert sheet["C44"].value == "second week"
+        assert sheet["I47"].value is None
+        assert sheet["E7"].value == "=D7-C7"
+        assert sheet["E38"].value == "=SUM(E7:E37)"
+
+
+
+class TestSeikaHoukokushoBulkExport:
+    def test_period_archive_and_draft_download(
+        self, client, admin_cookie, staff_cookie, test_db, linked_student
+    ):
+        from io import BytesIO as _BytesIO
+        from zipfile import ZipFile
+
+        from src.models.work_report import DailyReport, MonthlyReport, ReportStatus
+
+        year, month = date.today().year, date.today().month
+        _auth(client, admin_cookie)
+        last_day = calendar.monthrange(year, month)[1]
+        draft = MonthlyReport(
+            student_id=linked_student.id,
+            year=year,
+            month=month,
+            status=ReportStatus.DRAFT,
+            week_2="second week",
+        )
+        test_db.add(draft)
+        test_db.flush()
+        for day_number in range(1, last_day + 1):
+            test_db.add(
+                DailyReport(
+                    monthly_report_id=draft.id,
+                    work_date=date(year, month, day_number),
+                    is_day_off=day_number == 1,
+                    start_time=None if day_number == 1 else time(9, 0),
+                    finish_time=None if day_number == 1 else time(17, 0),
+                    description=None if day_number == 1 else "work",
+                )
+            )
+        test_db.commit()
+
+        items = client.get(f"/api/v1/reports?year={year}&month={month}").json()["data"]["items"]
+        downloadable = [item for item in items if item["report_id"]]
+        assert downloadable, "draft row must be downloadable by an admin"
+        assert any(item["status"] == "draft" for item in downloadable)
+
+        _auth(client, staff_cookie)
+        assert client.get("/api/v1/reports/export", params={"year": year, "month": month}).status_code == 403
+        assert client.get(f"/api/v1/reports/{downloadable[0]['report_id']}/export").status_code == 403
+
+        _auth(client, admin_cookie)
+        archive = client.get("/api/v1/reports/export", params={"year": year, "month": month})
+        assert archive.status_code == 200, archive.text
+        assert archive.headers["content-type"] == "application/zip"
+        assert f"reports_{year}-{month:02d}.zip" in archive.headers["content-disposition"]
+
+        with ZipFile(_BytesIO(archive.content)) as bundle:
+            names = bundle.namelist()
+            assert len(names) == len(downloadable)
+            for name in names:
+                assert name.endswith(".xlsx")
+                sheet = load_workbook(_BytesIO(bundle.read(name))).active
+                assert sheet["B2"].value == "成果報告書（固定制）　勤務記録表"
+
+        empty = client.get("/api/v1/reports/export", params={"year": 2019, "month": 1})
+        assert empty.status_code == 404
+        assert empty.json()["detail"]["code"] == "REPORT_EXPORT_EMPTY"
