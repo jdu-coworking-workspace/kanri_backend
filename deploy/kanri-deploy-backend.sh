@@ -40,6 +40,8 @@ done
 
 mkdir -p "$APP_DIR"
 chown "$APP_USER:$APP_USER" "$APP_DIR"
+# rsync runs as the application user, so it must be able to traverse TMP.
+chmod a+rx "$TMP"
 chmod -R a+rX "$TMP/new"
 
 echo "==> Fayllar ko'chirilmoqda"

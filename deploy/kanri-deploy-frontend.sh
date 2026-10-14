@@ -42,6 +42,7 @@ mkdir -p "$APP_DIR"
 chown "$APP_USER:$APP_USER" "$APP_DIR"
 
 # TMP root ga tegishli, kanri o'qiy olishi kerak.
+chmod a+rx "$TMP"
 chmod -R a+rX "$TMP/new"
 
 echo "==> Fayllar ko'chirilmoqda"
