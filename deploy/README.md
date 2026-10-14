@@ -41,7 +41,15 @@ chunki u ilova papkasida turishi kerak.
 | `backend/deploy/kanri-api.service` | `/etc/systemd/system/kanri-api.service` |
 | `backend/deploy/nginx/kanri.conf` | `/etc/nginx/sites-available/kanri` |
 | `backend/deploy/kanri-deploy-frontend.sh` | `/usr/local/bin/kanri-deploy-frontend.sh` |
+| `backend/deploy/kanri-deploy-backend.sh` | `/usr/local/bin/kanri-deploy-backend.sh` |
 | `frontend/ecosystem.config.js` | Artefakt bilan keladi, ko'chirilmaydi |
+
+Backend repository `main` branchiga push bo'lganda `.github/workflows/deploy.yml`
+avval PostgreSQL service bilan testlarni ishga tushiradi. Testlar muvaffaqiyatli
+bo'lsa, artifact S3 ga yuklanadi va AWS SSM orqali
+`/usr/local/bin/kanri-deploy-backend.sh` chaqiriladi. EC2 scripti `alembic
+upgrade head`, `kanri-api` systemd restart va `127.0.0.1:8000/` health checkni
+bajaradi.
 
 ---
 
