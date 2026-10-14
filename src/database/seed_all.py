@@ -92,9 +92,6 @@ def seed_all():
                 semester=s_info["semester"],
                 skill_rank=s_info["skill_rank"],
                 work_status=WorkStatus.ACTIVE,
-                point_1=10 + (idx * 2),
-                point_2=15 + (idx * 3),
-                point_3=20 + idx,
                 grad_year_month=date(2027, 3, 31)
             )
             db.add(new_student)

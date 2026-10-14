@@ -102,6 +102,20 @@ class TestProjectCRUD:
         test_db.refresh(sample_project)
         assert sample_project.status == ProjectStatus.DONE
 
+    def test_staff_cannot_update_or_delete_project(
+        self, client: TestClient, staff_cookie: str, sample_project: Project, test_db: Session
+    ):
+        client.cookies.set("access_token", staff_cookie)
+        update = client.put(
+            f"/api/v1/projects/{sample_project.id}",
+            json={"status": "done"},
+        )
+        delete = client.delete(f"/api/v1/projects/{sample_project.id}")
+        assert update.status_code == 403
+        assert delete.status_code == 403
+        test_db.refresh(sample_project)
+        assert sample_project.status != ProjectStatus.DONE
+
     def test_delete_project(
         self, client: TestClient, admin_cookie: str, sample_project: Project, test_db: Session
     ):

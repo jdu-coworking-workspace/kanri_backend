@@ -6,10 +6,11 @@ from sqlalchemy import or_
 
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session, joinedload, selectinload
+
 # pyrefly: ignore [missing-import]
 from src.models.project_member import ProjectMember
 
-from src.models.student import Student
+from src.models.student import SemesterEnum, SkillRank, Student, WorkStatus
 
 
 class StudentRepository:
@@ -23,6 +24,10 @@ class StudentRepository:
         return db.query(Student).filter(Student.student_code == student_code).first()
 
     @staticmethod
+    def get_by_user_id(db: Session, user_id: UUID) -> Optional[Student]:
+        return db.query(Student).filter(Student.user_id == user_id).first()
+
+    @staticmethod
     def get_by_email(db: Session, email: str) -> Optional[Student]:
         return db.query(Student).filter(Student.email == email).first()
 
@@ -32,6 +37,9 @@ class StudentRepository:
         page: int,
         limit: int,
         q: Optional[str] = None,
+        skill_rank: Optional[SkillRank] = None,
+        work_status: Optional[WorkStatus] = None,
+        semester: Optional[SemesterEnum] = None,
     ) -> Tuple[List[Student], int]:
         query = db.query(Student).options(selectinload(Student.project_memberships))
 
@@ -44,6 +52,14 @@ class StudentRepository:
                     Student.student_code.ilike(search),
                 )
             )
+        if skill_rank:
+            query = query.filter(Student.skill_rank == skill_rank)
+
+        if work_status:
+            query = query.filter(Student.work_status == work_status)
+
+        if semester:
+            query = query.filter(Student.semester == semester)
 
         total = query.count()
         items = (

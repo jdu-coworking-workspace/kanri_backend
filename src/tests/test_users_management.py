@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
-from src.models.user import User, UserRole
+from src.models.user import User
 
 class TestUsersManagement:
     
@@ -64,6 +64,43 @@ class TestUsersManagement:
         body = resp.json()
         assert body["success"] is True
         assert body["data"]["role"] == "admin"
+
+    def test_create_user_accepts_uppercase_admin_role(self, client: TestClient, admin_cookie: str):
+        """Eski DB/API registri (ADMIN) ham qabul qilinadi, javob esa 'admin'."""
+        client.cookies.set("access_token", admin_cookie)
+        resp = client.post(
+            "/api/v1/users/",
+            json={
+                "email": "legacy_admin@test.com",
+                "password": "password123",
+                "full_name": "Legacy Admin",
+                "role": "ADMIN",
+            },
+        )
+        assert resp.status_code == 201
+        assert resp.json()["data"]["role"] == "admin"
+
+    def test_create_user_rejects_unknown_role(self, client: TestClient, admin_cookie: str):
+        client.cookies.set("access_token", admin_cookie)
+        resp = client.post(
+            "/api/v1/users/",
+            json={
+                "email": "bad_role@test.com",
+                "password": "password123",
+                "full_name": "Bad Role",
+                "role": "editor",
+            },
+        )
+        assert resp.status_code == 422
+
+    def test_update_user_role_accepts_uppercase(self, client: TestClient, admin_cookie: str, staff_user: User):
+        client.cookies.set("access_token", admin_cookie)
+        resp = client.put(
+            f"/api/v1/users/{staff_user.id}/role",
+            json={"role": "ADMIN"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["data"]["role"] == "admin"
 
     def test_delete_user(self, client: TestClient, admin_cookie: str, staff_user: User):
         client.cookies.set("access_token", admin_cookie)

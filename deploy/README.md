@@ -28,7 +28,7 @@ joyda bir xil qilinadi:
 | `backend/.env` → `CORS_ORIGIN` | `https://DOMEN` |
 | Nginx `server_name` va `certbot -d` | `DOMEN` |
 
-Repolar (branch `mvp`):
+Repolar (branch `main`):
 
 - https://github.com/jdu-coworking-workspace/kanri_backend.git
 - https://github.com/jdu-coworking-workspace/kanri_frontend.git
@@ -262,7 +262,8 @@ CREATE DATABASE cowork_db OWNER kanri;
 ```bash
 sudo -u kanri -H bash
 cd /var/www/kanri
-git clone -b mvp https://github.com/jdu-coworking-workspace/kanri_backend.git backend
+git clone -b main https://github.com/jdu-coworking-workspace/kanri_backend.git backend
+git clone -b main https://github.com/jdu-coworking-workspace/kanri_frontend.git frontend
 cd backend
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
@@ -532,4 +533,4 @@ sudo -u kanri -H bash -c 'cd /var/www/kanri/backend && git pull && \
 sudo systemctl restart kanri-api
 ```
 
-Frontend: `mvp` ga push qilinsa GitHub Actions o'zi build qilib chiqaradi.
+Frontend: `main` ga push qilinsa GitHub Actions o'zi build qilib chiqaradi.

@@ -23,7 +23,16 @@ from sqlalchemy.orm import sessionmaker
 
 from src.main import app
 # Barcha modellarni import — Base.metadata'ga ro'yxatdan o'tkazish uchun
-from src.models import User, Student, Project, ProjectMember, ProjectHistory  # noqa: F401
+from src.models import (  # noqa: F401
+    User,
+    Student,
+    Project,
+    ProjectMember,
+    ProjectHistory,
+    MonthlyReport,
+    DailyReport,
+)
+from src.models.user import UserRole
 from src.models.base import Base
 from src.database.session import get_db
 from src.utils.security import get_password_hash
@@ -98,7 +107,7 @@ def admin_user(test_db) -> User:
         email="admin@test.com",
         password_hash=get_password_hash("secret123"),
         full_name="Admin Xodim",
-        role="admin",
+        role=UserRole.ADMIN,
     )
     test_db.add(user)
     test_db.commit()
@@ -113,7 +122,7 @@ def staff_user(test_db) -> User:
         email="staff@test.com",
         password_hash=get_password_hash("secret123"),
         full_name="Staff Xodim",
-        role="staff",
+        role=UserRole.STAFF,
     )
     test_db.add(user)
     test_db.commit()
@@ -133,6 +142,21 @@ def admin_cookie(client, admin_user) -> str:
 
 
 @pytest.fixture
+def student_user(test_db) -> User:
+    """Loyihalarni faqat ko'radigan talaba (role='student')."""
+    user = User(
+        email="student@test.com",
+        password_hash=get_password_hash("secret123"),
+        full_name="Student User",
+        role=UserRole.STUDENT,
+    )
+    test_db.add(user)
+    test_db.commit()
+    test_db.refresh(user)
+    return user
+
+
+@pytest.fixture
 def staff_cookie(client, staff_user) -> str:
     """Staff login qilib access_token cookie'sini qaytaradi."""
     resp = client.post(
@@ -140,6 +164,17 @@ def staff_cookie(client, staff_user) -> str:
         json={"email": "staff@test.com", "password": "secret123"},
     )
     assert resp.status_code == 200, f"Staff login failed: {resp.text}"
+    return resp.cookies["access_token"]
+
+
+@pytest.fixture
+def student_cookie(client, student_user) -> str:
+    """Student login qilib access_token cookie'sini qaytaradi."""
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": "student@test.com", "password": "secret123"},
+    )
+    assert resp.status_code == 200, f"Student login failed: {resp.text}"
     return resp.cookies["access_token"]
 
 

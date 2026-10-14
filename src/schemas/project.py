@@ -19,6 +19,9 @@ class ProjectBaseSchema(BaseModel):
     leader_student_id: Optional[UUID] = Field(
         None, description="Loyiha rahbari (Student ID)"
     )
+    description: Optional[str] = Field(
+        None, description="Loyiha haqida batafsil ma'lumot"
+    )
 
 
 class ProjectCreateSchema(ProjectBaseSchema):
@@ -33,6 +36,7 @@ class ProjectUpdateSchema(BaseModel):
     status: Optional[ProjectStatus] = None
     category: Optional[ProjectCategory] = None
     leader_student_id: Optional[UUID] = None
+    description: Optional[str] = None
 
 
 class ProjectMemberSimpleSchema(BaseModel):

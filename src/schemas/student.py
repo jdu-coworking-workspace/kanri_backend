@@ -17,9 +17,6 @@ class StudentBaseSchema(BaseModel):
     semester: Optional[SemesterEnum] = None
     skill_rank: Optional[SkillRank] = None
     work_status: Optional[WorkStatus] = None
-    point_1: Optional[int] = 0
-    point_2: Optional[int] = 0
-    point_3: Optional[int] = 0
 
 
 class StudentCreateSchema(StudentBaseSchema):
@@ -36,9 +33,6 @@ class StudentUpdateSchema(BaseModel):
     semester: Optional[SemesterEnum] = None
     skill_rank: Optional[SkillRank] = None
     work_status: Optional[WorkStatus] = None
-    point_1: Optional[int] = None
-    point_2: Optional[int] = None
-    point_3: Optional[int] = None
 
 
 class StudentCopySchema(BaseModel):

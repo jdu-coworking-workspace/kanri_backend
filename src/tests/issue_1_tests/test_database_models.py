@@ -15,9 +15,18 @@ import uuid
 import pytest
 from datetime import date, datetime
 
-from src.models import User, Student, Project, ProjectMember, ProjectHistory
+from src.models import (
+    User,
+    Student,
+    Project,
+    ProjectMember,
+    ProjectHistory,
+    MonthlyReport,
+    DailyReport,
+)
 from src.models.student import SkillRank, WorkStatus, SemesterEnum
 from src.models.project import ProjectStatus, ProjectCategory
+from src.models.user import UserRole
 from src.utils.security import get_password_hash
 
 
@@ -49,7 +58,30 @@ class TestUserModel:
             password_hash="hash",
             full_name="Test",
         )
-        assert user.role is None or user.role == "staff"
+        assert user.role is None or user.role == UserRole.STAFF
+
+    def test_user_role_api_values_are_lowercase(self):
+        """API shartnomasi: role qiymatlari doim kichik harf."""
+        assert {role.value for role in UserRole} == {"staff", "admin", "student"}
+        assert UserRole.ADMIN.value == "admin"
+        assert UserRole.STAFF.value == "staff"
+        assert UserRole.STUDENT.value == "student"
+
+    def test_user_role_parse_accepts_any_case(self):
+        """DB name (ADMIN) va API value (admin) bir xil memberga aylanadi."""
+        assert UserRole.parse("admin") is UserRole.ADMIN
+        assert UserRole.parse("ADMIN") is UserRole.ADMIN
+        assert UserRole.parse("Admin") is UserRole.ADMIN
+        assert UserRole.parse("staff") is UserRole.STAFF
+        assert UserRole.parse("STAFF") is UserRole.STAFF
+        assert UserRole.parse("student") is UserRole.STUDENT
+        assert UserRole.parse("STUDENT") is UserRole.STUDENT
+        assert UserRole.parse(UserRole.ADMIN) is UserRole.ADMIN
+        assert UserRole("ADMIN") is UserRole.ADMIN
+
+    def test_user_role_parse_rejects_unknown(self):
+        with pytest.raises(ValueError):
+            UserRole.parse("editor")
 
     def test_user_create_and_read(self, test_db):
         """User DB'ga yoziladi va o'qiladi."""
@@ -66,7 +98,9 @@ class TestUserModel:
         fetched = test_db.query(User).filter(User.email == "user1@test.com").first()
         assert fetched is not None
         assert fetched.full_name == "Test User"
-        assert fetched.role == "admin"
+        assert fetched.role == UserRole.ADMIN
+        assert fetched.role.value == "admin"
+        assert fetched.is_admin is True
         assert fetched.id is not None
 
     def test_user_timestamps_auto_populated(self, test_db):
@@ -109,7 +143,7 @@ class TestStudentModel:
         expected = {
             "id", "full_name", "kana_name", "student_code", "email",
             "avatar_url", "semester", "skill_rank", "work_status",
-            "grad_year_month", "point_1", "point_2", "point_3",
+            "grad_year_month",
             "created_at", "updated_at",
         }
         assert expected.issubset(cols)
@@ -140,7 +174,6 @@ class TestStudentModel:
             work_status=WorkStatus.ACTIVE,
             semester=SemesterEnum.SEMESTER_4,
             grad_year_month=date(2026, 6, 1),
-            point_1=10, point_2=20, point_3=30,
         )
         test_db.add(student)
         test_db.commit()
@@ -152,7 +185,6 @@ class TestStudentModel:
         assert fetched is not None
         assert fetched.full_name == "Karimova Nilufar"
         assert fetched.skill_rank == SkillRank.S
-        assert fetched.point_1 == 10
 
     def test_student_code_unique_constraint(self, test_db):
         """Bir xil student_code ikki marta qo'shilsa xato."""
@@ -436,6 +468,7 @@ class TestModelsImport:
     def test_all_models_importable(self):
         from src.models import (  # noqa: F401
             Base, User, Student, Project, ProjectMember, ProjectHistory,
+            MonthlyReport, DailyReport,
         )
         assert True
 
@@ -444,4 +477,5 @@ class TestModelsImport:
         from src.models.base import Base
         table_names = set(Base.metadata.tables.keys())
         assert {"users", "students", "projects",
-                "project_members", "project_history"}.issubset(table_names)
+                "project_members", "project_history",
+                "monthly_reports", "daily_reports"}.issubset(table_names)

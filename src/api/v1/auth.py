@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, Response
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
-from src.schemas.auth import LoginRequest, UserOut
-from src.services.auth_service import authenticate_user
+from src.schemas.auth import ChangePasswordRequest, LoginRequest, UserOut
+from src.services.auth_service import authenticate_user, change_password
 # pyrefly: ignore [missing-import]
 from src.api.deps import get_db, get_current_user
 from src.models.user import User
@@ -68,6 +68,16 @@ def logout(
     return {
         "success": True
     }
+
+
+@router.post("/change-password")
+def update_password(
+    payload: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    change_password(db, current_user, payload)
+    return {"success": True}
 
 
 @router.get("/me")
