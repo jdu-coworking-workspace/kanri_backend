@@ -40,6 +40,8 @@ done
 
 mkdir -p "$APP_DIR"
 chown "$APP_USER:$APP_USER" "$APP_DIR"
+# rsync runs as the application user, so it must be able to traverse TMP.
+chmod a+rx "$TMP"
 chmod -R a+rX "$TMP/new"
 
 echo "==> Fayllar ko'chirilmoqda"
@@ -59,11 +61,21 @@ cd "$APP_DIR"
 sudo -u "$APP_USER" -H "$APP_DIR/venv/bin/alembic" upgrade head
 
 echo "==> Systemd restart"
+systemctl daemon-reload
 systemctl restart "$SERVICE"
 systemctl is-active --quiet "$SERVICE"
 
 echo "==> Health check"
-curl --fail --silent --show-error --max-time 15 \
-    http://127.0.0.1:8000/ >/dev/null
+for attempt in $(seq 1 15); do
+    if curl --fail --silent --show-error --max-time 5 \
+        http://127.0.0.1:8000/ >/dev/null; then
+        break
+    fi
+    if [ "$attempt" -eq 15 ]; then
+        echo "XATO: backend health check 15 urinishdan keyin ham muvaffaqiyatsiz." >&2
+        exit 1
+    fi
+    sleep 1
+done
 
 echo "==> Tayyor: $KEY"
