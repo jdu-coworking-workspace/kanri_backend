@@ -147,3 +147,41 @@ def _extract_s3_key(url: str) -> str:
     """https://bucket.s3.region.amazonaws.com/key dan key ni ajratib oladi."""
     parts = url.split(".amazonaws.com/", 1)
     return parts[1] if len(parts) == 2 else ""
+
+
+# ─────────────────────────────────────────────
+# Anonymous avatar (hamma uchun bitta umumiy rasm)
+# ─────────────────────────────────────────────
+
+ANONYMOUS_AVATAR_KEY = "avatars/anonymous.png"
+ANONYMOUS_AVATAR_FILE = Path(__file__).resolve().parent.parent / "assets" / "anonymous-avatar.png"
+
+
+def get_anonymous_avatar_url() -> str:
+    if settings.S3_MODE == "production":
+        return (
+            f"https://{settings.AWS_S3_BUCKET_NAME}"
+            f".s3.{settings.AWS_REGION}.amazonaws.com/{ANONYMOUS_AVATAR_KEY}"
+        )
+    return f"/media/{ANONYMOUS_AVATAR_KEY}"
+
+
+def ensure_anonymous_avatar() -> None:
+    """src/assets dagi anonymous rasmni storage'ga (media yoki S3) qo'yadi."""
+    if not ANONYMOUS_AVATAR_FILE.exists():
+        return
+    data = ANONYMOUS_AVATAR_FILE.read_bytes()
+    try:
+        if settings.S3_MODE == "production":
+            _get_s3_client().put_object(
+                Bucket=settings.AWS_S3_BUCKET_NAME,
+                Key=ANONYMOUS_AVATAR_KEY,
+                Body=data,
+                ContentType="image/png",
+            )
+        else:
+            target = MEDIA_ROOT / ANONYMOUS_AVATAR_KEY
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+    except Exception as e:
+        print(f"Anonymous avatar yuklanmadi: {e}")

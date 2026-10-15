@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from src.config import settings
 from src.api.v1.router import api_router
+from src.utils.s3 import ensure_anonymous_avatar
 
 app = FastAPI(
     title="Cowork Management API",
@@ -31,6 +32,7 @@ if settings.S3_MODE == "local":
     MEDIA_DIR.mkdir(parents=True, exist_ok=True)
     app.mount("/media", StaticFiles(directory=str(MEDIA_DIR)), name="media")
 
+ensure_anonymous_avatar()
 
 @app.get("/")
 def root():
@@ -38,4 +40,4 @@ def root():
 
 
 # Statistics router enabled
-app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router, prefix="/api/v1")

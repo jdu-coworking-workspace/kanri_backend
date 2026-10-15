@@ -61,6 +61,7 @@ def ensure_students(db: Session, minimum: int = 5) -> list:
             skill_rank=SkillRank.A,
             work_status=WorkStatus.ACTIVE,
             grad_year_month=date(2027, 3, 31),
+            is_first_login=True,
         )
         db.add(student)
     db.commit()

@@ -1,10 +1,11 @@
 from enum import Enum
 # pyrefly: ignore [missing-import]
-from sqlalchemy import Column, String, Date, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, String, Date, Boolean, ForeignKey, Enum as SQLEnum
 # pyrefly: ignore [missing-import]
 from sqlalchemy.dialects.postgresql import UUID
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import expression
 from .base import Base, TimeStampsMixin, generate_uuid
 
 class SkillRank(str, Enum):
@@ -46,6 +47,7 @@ class Student(Base, TimeStampsMixin):
         nullable=True,
     )
     avatar_url = Column(String(500), nullable=True)
+    is_first_login = Column(Boolean, nullable=False, default=True, server_default=expression.true())
     grad_year_month = Column(Date, nullable=True)
 
     semester = Column(SQLEnum(SemesterEnum), nullable=True)

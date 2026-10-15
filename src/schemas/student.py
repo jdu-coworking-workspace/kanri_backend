@@ -47,6 +47,7 @@ class StudentOutSchema(StudentBaseSchema):
     created_at: datetime
     updated_at: datetime
     concurrent_projects_count: Optional[int] = 0
+    is_first_login: bool = True
 
     class Config:
         from_attributes = True

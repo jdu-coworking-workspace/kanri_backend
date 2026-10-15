@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 
+from src.services.student_service import ANONYMOUS_AVATAR_URL
 from src.api.deps import get_current_user, require_admin
 from src.database.session import get_db
 from src.models.user import User, UserRole
@@ -43,7 +44,7 @@ async def _read_avatar_file(file: UploadFile) -> tuple[bytes, str]:
 
 
 def _store_avatar(db: Session, student: Student, file_bytes: bytes, content_type: str) -> str:
-    if student.avatar_url:
+    if student.avatar_url and student.avatar_url != ANONYMOUS_AVATAR_URL:
         delete_avatar(str(student.avatar_url))
 
     file_url = upload_avatar(
