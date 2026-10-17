@@ -28,6 +28,7 @@ class UserService:
 
     @staticmethod
     def create_user(db: Session, user_data: UserCreateSchema) -> User:
+        print("asd")
         role = UserRole.parse(user_data.role)
         if role is UserRole.STUDENT:
             raise HTTPException(
@@ -41,18 +42,20 @@ class UserService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Bu elektron pochta orqali foydalanuvchi allaqachon ro'yxatdan o'tgan",
             )
-            
+
         new_user_data = {
             "email": user_data.email,
             "full_name": user_data.full_name,
             "role": role,
-            "password_hash": get_password_hash(user_data.password)
+            "password_hash": get_password_hash(user_data.password),
         }
-        
+
         return user_repository.create_user(db, new_user_data)
 
     @staticmethod
-    def update_role(db: Session, user_id: UUID, role_data: UserRoleUpdateSchema) -> User:
+    def update_role(
+        db: Session, user_id: UUID, role_data: UserRoleUpdateSchema
+    ) -> User:
         role = UserRole.parse(role_data.role)
         if role is UserRole.STUDENT:
             raise HTTPException(
@@ -74,6 +77,6 @@ class UserService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="O'zingizni o'chira olmaysiz",
             )
-            
+
         user = UserService.get_user(db, user_id)
         user_repository.delete_user(db, user)

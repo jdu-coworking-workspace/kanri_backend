@@ -1,6 +1,7 @@
 from uuid import UUID
 
 # pyrefly: ignore [missing-import]
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from src.models.student import Student
@@ -65,3 +66,15 @@ class WorkReportRepository:
         )
         by_student = {report.student_id: report for report in reports}
         return [(student, by_student.get(student.id)) for student in students]
+
+    @staticmethod
+    def count_for_student_period(db: Session, student_id, year: int, month: int) -> int:
+        return (
+            db.query(func.count(MonthlyReport.id))
+            .filter(
+                MonthlyReport.student_id == student_id,
+                MonthlyReport.year == year,
+                MonthlyReport.month == month,
+            )
+            .scalar()
+        ) or 0
