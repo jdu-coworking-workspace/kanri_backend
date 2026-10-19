@@ -141,7 +141,6 @@ def serialize_report(report: MonthlyReport) -> dict:
         "id": str(report.id),
         "title": report.title,
         "report_type": rtype.value,
-        "cowork_no": report.cowork_no,
         "condition_1_label": report.condition_1_label,
         "condition_2_label": report.condition_2_label,
         "unit_price_1": report.unit_price_1,
@@ -275,7 +274,6 @@ class WorkReportService:
             student_id=student.id,
             title=payload.title,
             report_type=payload.report_type,
-            cowork_no=_blank(payload.cowork_no) if is_output else None,
             condition_1_label=_blank(payload.condition_1_label) if is_output else None,
             condition_2_label=_blank(payload.condition_2_label) if is_output else None,
             year=year,
@@ -361,8 +359,6 @@ class WorkReportService:
         if _blank(payload.title):
             report.title = _blank(payload.title)
         if output:
-            if payload.cowork_no is not None:
-                report.cowork_no = _blank(payload.cowork_no)
             if _blank(payload.condition_1_label):
                 report.condition_1_label = _blank(payload.condition_1_label)
             if payload.condition_2_label is not None:

@@ -11,7 +11,12 @@ from sqlalchemy.orm import Session
 from src.database.session import SessionLocal
 from src.models.student import Student, SemesterEnum, SkillRank, WorkStatus
 from src.models.user import User, UserRole
-from src.models.work_report import DailyReport, MonthlyReport, ReportStatus
+from src.models.work_report import (
+    DailyReport,
+    MonthlyReport,
+    ReportStatus,
+    ReportType,
+)
 
 DESCRIPTIONS = [
     "資料の準備と整理",
@@ -68,8 +73,8 @@ def ensure_students(db: Session, minimum: int = 5) -> list:
     return db.query(Student).order_by(Student.full_name.asc()).all()
 
 
-def build_days(year: int, month: int, offset: int) -> list:
-    """Oyning kunlari: dam olish kuni yakshanba, boshqalarda ish vaqti."""
+def build_days(year: int, month: int, offset: int, report_type: ReportType) -> list:
+    """Demo days for either hourly or output reports."""
     last_day = calendar.monthrange(year, month)[1]
     start_hour = 9 if offset % 2 == 0 else 13
     finish_hour = start_hour + 8
@@ -80,15 +85,30 @@ def build_days(year: int, month: int, offset: int) -> list:
         if is_day_off:
             days.append({"work_date": work_date, "is_day_off": True})
             continue
-        days.append(
-            {
-                "work_date": work_date,
-                "is_day_off": False,
-                "start_time": time(start_hour, 0),
-                "finish_time": time(finish_hour % 24, 0),
-                "description": DESCRIPTIONS[(work_date.toordinal() + offset) % len(DESCRIPTIONS)],
-            }
-        )
+        description = DESCRIPTIONS[
+            (work_date.toordinal() + offset) % len(DESCRIPTIONS)
+        ]
+        if report_type is ReportType.OUTPUT:
+            days.append(
+                {
+                    "work_date": work_date,
+                    "is_day_off": False,
+                    "work_minutes": 480,
+                    "count_1": (work_date.day + offset) % 5 + 1,
+                    "count_2": (work_date.day + offset) % 3,
+                    "description": description,
+                }
+            )
+        else:
+            days.append(
+                {
+                    "work_date": work_date,
+                    "is_day_off": False,
+                    "start_time": time(start_hour, 0),
+                    "finish_time": time(finish_hour % 24, 0),
+                    "description": description,
+                }
+            )
     return days
 
 
@@ -121,11 +141,29 @@ def seed_reports():
                     if period_index == 0
                     else STATUS_CYCLE[(student_index + period_index) % len(STATUS_CYCLE)]
                 )
+                report_type = (
+                    ReportType.OUTPUT
+                    if period_index == 1 and student_index % 2 == 1
+                    else ReportType.HOURLY
+                )
                 report = MonthlyReport(
                     student_id=student.id,
                     year=year,
                     month=month,
-                    title=f"Demo report {period_index + 1}",
+                    title=(
+                        "Demo output report"
+                        if report_type is ReportType.OUTPUT
+                        else "Demo hourly report"
+                    ),
+                    report_type=report_type,
+                    condition_1_label=(
+                        "1 daqiqalik video"
+                        if report_type is ReportType.OUTPUT
+                        else None
+                    ),
+                    condition_2_label=(
+                        "Qisqa reel" if report_type is ReportType.OUTPUT else None
+                    ),
                     status=status,
                     week_1="第1週は予定どおりに完了しました。",
                     week_2="第2週は担当業務を期限内に完了しました。",
@@ -146,7 +184,9 @@ def seed_reports():
                 db.add(report)
                 db.flush()
 
-                for entry in build_days(year, month, student_index + period_index):
+                for entry in build_days(
+                    year, month, student_index + period_index, report_type
+                ):
                     db.add(
                         DailyReport(
                             monthly_report_id=report.id,
@@ -155,6 +195,9 @@ def seed_reports():
                             start_time=entry.get("start_time"),
                             finish_time=entry.get("finish_time"),
                             description=entry.get("description"),
+                            work_minutes=entry.get("work_minutes"),
+                            count_1=entry.get("count_1"),
+                            count_2=entry.get("count_2"),
                         )
                     )
                 total += 1

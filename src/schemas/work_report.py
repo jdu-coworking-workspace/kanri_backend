@@ -28,7 +28,6 @@ class MonthlyReportUpdateIn(BaseModel):
     week_4: Optional[str] = Field(None, max_length=4000)
     week_5: Optional[str] = Field(None, max_length=4000)
     days: list[DailyEntryIn] = Field(default_factory=list)
-    cowork_no: Optional[str] = Field(None, max_length=50)
     condition_1_label: Optional[str] = Field(None, max_length=100)
     condition_2_label: Optional[str] = Field(None, max_length=100)
 
@@ -46,7 +45,6 @@ class ReportReviewIn(BaseModel):
 class MonthlyReportCreateIn(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     report_type: ReportType = ReportType.HOURLY
-    cowork_no: Optional[str] = Field(None, max_length=50)
     condition_1_label: Optional[str] = Field(None, max_length=100)
     condition_2_label: Optional[str] = Field(None, max_length=100)
 
