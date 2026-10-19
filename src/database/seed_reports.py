@@ -125,6 +125,7 @@ def seed_reports():
                     student_id=student.id,
                     year=year,
                     month=month,
+                    title=f"Demo report {period_index + 1}",
                     status=status,
                     week_1="第1週は予定どおりに完了しました。",
                     week_2="第2週は担当業務を期限内に完了しました。",
