@@ -269,6 +269,14 @@ class WorkReportService:
                 "REPORT_LIMIT_REACHED",
                 f"Bir oyda ko'pi bilan {MAX_REPORTS_PER_MONTH} ta hisobot yaratish mumkin",
             )
+        if WorkReportRepository.get_for_student_period_type(
+            db, student.id, year, month, payload.report_type
+        ):
+            _error(
+                status.HTTP_409_CONFLICT,
+                "REPORT_TYPE_EXISTS",
+                f"Bu oyda {payload.report_type.value} turidagi hisobot allaqachon mavjud",
+            )
         is_output = payload.report_type is ReportType.OUTPUT
         report = MonthlyReport(
             student_id=student.id,
@@ -322,10 +330,20 @@ class WorkReportService:
         current_count = sum(
             1 for r in reports if r.year == today.year and r.month == today.month
         )
+        current_types = {
+            r.report_type.value
+            for r in reports
+            if r.year == today.year and r.month == today.month
+        }
         return {
             "current_year": today.year,
             "current_month": today.month,
             "can_add_current": current_count < MAX_REPORTS_PER_MONTH,
+            "available_report_types": [
+                report_type.value
+                for report_type in ReportType
+                if report_type.value not in current_types
+            ],
             "items": [serialize_own_summary(report) for report in reports],
         }
 

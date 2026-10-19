@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from src.models.student import Student
-from src.models.work_report import MonthlyReport
+from src.models.work_report import MonthlyReport, ReportType
 
 
 class WorkReportRepository:
@@ -64,8 +64,14 @@ class WorkReportRepository:
             .filter(MonthlyReport.year == year, MonthlyReport.month == month)
             .all()
         )
-        by_student = {report.student_id: report for report in reports}
-        return [(student, by_student.get(student.id)) for student in students]
+        by_student = {}
+        for report in reports:
+            by_student.setdefault(report.student_id, []).append(report)
+        return [
+            (student, report)
+            for student in students
+            for report in (by_student.get(student.id) or [None])
+        ]
 
     @staticmethod
     def count_for_student_period(db: Session, student_id, year: int, month: int) -> int:
@@ -78,3 +84,18 @@ class WorkReportRepository:
             )
             .scalar()
         ) or 0
+
+    @staticmethod
+    def get_for_student_period_type(
+        db: Session, student_id, year: int, month: int, report_type: ReportType
+    ) -> MonthlyReport | None:
+        return (
+            db.query(MonthlyReport)
+            .filter(
+                MonthlyReport.student_id == student_id,
+                MonthlyReport.year == year,
+                MonthlyReport.month == month,
+                MonthlyReport.report_type == report_type,
+            )
+            .first()
+        )

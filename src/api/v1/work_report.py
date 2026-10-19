@@ -20,6 +20,7 @@ from src.schemas.work_report import (
 from src.services.work_report_service import WorkReportService
 from src.utils.report_excel import build_monthly_report_xlsx
 from src.utils.report_excel_batch import build_period_archive
+from urllib.parse import quote
 
 router = APIRouter()
 
@@ -161,7 +162,10 @@ def export_report(
 ):
     report = WorkReportService.get_export_detail(db, report_id)
     content = build_monthly_report_xlsx(report)
-    filename = f"{report['student_code']}_{report['year']}-{report['month']:02d}.xlsx"
+    filename = (
+        f"{report['student_code']}_{report['year']}-{report['month']:02d}_"
+        f"{quote(report['title'], safe='-_')}.xlsx"
+    )
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
