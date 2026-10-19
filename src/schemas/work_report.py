@@ -2,7 +2,7 @@ from datetime import date, time
 from typing import Optional
 
 # pyrefly: ignore [missing-import]
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
 from src.models.work_report import ReportType
 
@@ -55,10 +55,3 @@ class MonthlyReportCreateIn(BaseModel):
         if not v:
             raise ValueError("Nom bo'sh bo'lmasligi kerak")
         return v
-
-    @model_validator(mode="after")
-    def check_output_fields(self):
-        if self.report_type is ReportType.OUTPUT:
-            if not (self.condition_1_label and self.condition_1_label.strip()):
-                raise ValueError("OUTPUT turida condition_1_label majburiy")
-        return self

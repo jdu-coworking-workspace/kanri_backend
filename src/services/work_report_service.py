@@ -21,6 +21,8 @@ from src.schemas.work_report import (
 from src.services.student_service import StudentService
 
 MAX_REPORTS_PER_MONTH = 2
+OUTPUT_CONDITION_1_LABEL = "[条件１]"
+OUTPUT_CONDITION_2_LABEL = "[条件２]"
 
 
 def _error(status_code: int, code: str, message: str) -> None:
@@ -282,8 +284,16 @@ class WorkReportService:
             student_id=student.id,
             title=payload.title,
             report_type=payload.report_type,
-            condition_1_label=_blank(payload.condition_1_label) if is_output else None,
-            condition_2_label=_blank(payload.condition_2_label) if is_output else None,
+            condition_1_label=(
+                _blank(payload.condition_1_label) or OUTPUT_CONDITION_1_LABEL
+                if is_output
+                else None
+            ),
+            condition_2_label=(
+                _blank(payload.condition_2_label) or OUTPUT_CONDITION_2_LABEL
+                if is_output
+                else None
+            ),
             year=year,
             month=month,
             status=ReportStatus.DRAFT,

@@ -156,14 +156,6 @@ def seed_reports():
                         else "Demo hourly report"
                     ),
                     report_type=report_type,
-                    condition_1_label=(
-                        "1 daqiqalik video"
-                        if report_type is ReportType.OUTPUT
-                        else None
-                    ),
-                    condition_2_label=(
-                        "Qisqa reel" if report_type is ReportType.OUTPUT else None
-                    ),
                     status=status,
                     week_1="第1週は予定どおりに完了しました。",
                     week_2="第2週は担当業務を期限内に完了しました。",
