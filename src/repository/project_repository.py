@@ -59,7 +59,8 @@ class ProjectRepository:
             query = query.join(Project.members).join(ProjectMember.student).filter(
                 or_(
                     Student.full_name.ilike(search),
-                    Student.student_code.ilike(search)
+                    Student.student_code.ilike(search),
+                    Student.kana_name.ilike(search)
                 )
             ).distinct() # Distinct is necessary because join might return duplicate projects
 

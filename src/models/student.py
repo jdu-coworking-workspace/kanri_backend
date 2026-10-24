@@ -31,6 +31,7 @@ class SemesterEnum(str, Enum):
     SEMESTER_7 = "7-semestr"
     SEMESTER_8 = "8-semestr"
     SEMESTER_9 = "9-semestr"
+    GRADUATED = "卒業"
 
 class Student(Base, TimeStampsMixin):
     __tablename__ = "students"
@@ -64,4 +65,16 @@ class Student(Base, TimeStampsMixin):
 
     @property
     def concurrent_projects_count(self):
-        return len([pm for pm in self.project_memberships if pm.left_at is None])
+        count = 0
+        for pm in self.project_memberships:
+            if pm.left_at is None:
+                project = pm.project
+                if project and getattr(project, 'status', None):
+                    try:
+                        from src.models.project import ProjectStatus
+                        if project.status == ProjectStatus.DONE:
+                            continue
+                    except Exception:
+                        pass
+                count += 1
+        return count

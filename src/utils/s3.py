@@ -28,6 +28,12 @@ def upload_avatar(file_bytes: bytes, content_type: str, student_id: str) -> str:
     return _upload_to_local(file_bytes, content_type, student_id)
 
 
+def upload_project_image(file_bytes: bytes, content_type: str, project_id: str) -> str:
+    if settings.S3_MODE == "production":
+        return _upload_to_s3(file_bytes, content_type, f"projects/{project_id}")
+    return _upload_to_local(file_bytes, content_type, f"projects/{project_id}")
+
+
 def delete_avatar(avatar_url: str) -> None:
     """
     S3_MODE ga qarab localdan yoki S3 dan o'chiradi.
@@ -50,7 +56,9 @@ def delete_avatar(avatar_url: str) -> None:
 
 def _upload_to_local(file_bytes: bytes, content_type: str, student_id: str) -> str:
     ext = _get_extension(content_type)
-    relative_path = f"avatars/{student_id}/{uuid.uuid4()}.{ext}"
+    prefix = "avatars" if not student_id.startswith("projects/") else "projects"
+    identifier = student_id if prefix == "avatars" else student_id.removeprefix("projects/")
+    relative_path = f"{prefix}/{identifier}/{uuid.uuid4()}.{ext}"
     full_path = MEDIA_ROOT / relative_path
 
     full_path.parent.mkdir(parents=True, exist_ok=True)
@@ -96,7 +104,9 @@ def _get_s3_client():
 
 def _upload_to_s3(file_bytes: bytes, content_type: str, student_id: str) -> str:
     ext = _get_extension(content_type)
-    key = f"avatars/{student_id}/{uuid.uuid4()}.{ext}"
+    prefix = "avatars" if not student_id.startswith("projects/") else "projects"
+    identifier = student_id if prefix == "avatars" else student_id.removeprefix("projects/")
+    key = f"{prefix}/{identifier}/{uuid.uuid4()}.{ext}"
 
     s3 = _get_s3_client()
     try:

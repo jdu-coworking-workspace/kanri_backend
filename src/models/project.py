@@ -32,6 +32,7 @@ class Project(Base, TimeStampsMixin):
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     overview = Column(Text, nullable=True)
+    image_url = Column(String(1024), nullable=True)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=True)
 

@@ -11,8 +11,9 @@ from src.api.deps import get_current_user, require_admin
 from src.database.session import get_db
 from src.models.user import User, UserRole
 from src.models.student import Student
+from src.models.project import Project
 from src.repository.student_repository import StudentRepository
-from src.utils.s3 import delete_avatar, upload_avatar
+from src.utils.s3 import delete_avatar, upload_avatar, upload_project_image
 
 router = APIRouter()
 
@@ -123,4 +124,37 @@ async def upload_student_avatar(
             "student_id": str(student_id),
             "file_url": file_url,
         },
+    }
+
+
+@router.post(
+    "/project-image",
+    status_code=status.HTTP_200_OK,
+    summary="Loyiha rasmini yuklash (Faqat adminlar)",
+)
+async def upload_project_image_file(
+    project_id: UUID = Form(..., description="Rasm yuklanadigan loyiha ID si"),
+    file: UploadFile = File(..., description="Rasm fayli (JPEG, PNG, WEBP, max 5 MB)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "PROJECT_NOT_FOUND", "message": "Loyiha topilmadi"},
+        )
+
+    file_bytes, content_type = await _read_avatar_file(file)
+    file_url = upload_project_image(
+        file_bytes=file_bytes,
+        content_type=content_type,
+        project_id=str(project_id),
+    )
+    project.image_url = file_url
+    db.commit()
+    db.refresh(project)
+    return {
+        "success": True,
+        "data": {"project_id": str(project_id), "file_url": file_url},
     }
