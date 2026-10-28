@@ -24,8 +24,7 @@ from src.services.project_service import ProjectService
 router = APIRouter()
 
 
-@router.get(
-    "/",
+@router.get("",
     response_model=ProjectListOutSchema,
     summary="Loyihalar ro'yxati",
     description="Loyihalar ro'yxatini pagination va filterlar (nomi, a'zo, holat, kategoriya) bilan olish",
@@ -80,8 +79,7 @@ def get_project(
     return {"success": True, "data": project}
 
 
-@router.post(
-    "/",
+@router.post("",
     status_code=status.HTTP_201_CREATED,
     summary="Yangi loyiha yaratish (Faqat adminlar)",
 )

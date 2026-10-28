@@ -4,7 +4,7 @@ from uuid import UUID
 # pyrefly: ignore [missing-import]
 from sqlalchemy import or_
 # pyrefly: ignore [missing-import]
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from src.models.project import Project, ProjectStatus, ProjectCategory
 from src.models.project_member import ProjectMember
@@ -19,7 +19,7 @@ class ProjectRepository:
             db.query(Project)
             .options(
                 joinedload(Project.leader),
-                joinedload(Project.members).joinedload(ProjectMember.student)
+                selectinload(Project.members).joinedload(ProjectMember.student)
             )
             .filter(Project.id == project_id)
             .first()
@@ -42,11 +42,11 @@ class ProjectRepository:
         
         query = db.query(Project).options(
             joinedload(Project.leader),
-            joinedload(Project.members).joinedload(ProjectMember.student)
+            selectinload(Project.members).joinedload(ProjectMember.student)
         )
 
-        if name:
-            query = query.filter(Project.name.ilike(f"%{name}%"))
+        if name and name.strip():
+            query = query.filter(Project.name.ilike(f"%{name.strip()}%"))
             
         if status:
             query = query.filter(Project.status == status)
@@ -54,15 +54,36 @@ class ProjectRepository:
         if category:
             query = query.filter(Project.category == category)
             
-        if member:
-            search = f"%{member}%"
-            query = query.join(Project.members).join(ProjectMember.student).filter(
+        if member and member.strip():
+            search = f"%{member.strip()}%"
+            # Search active members (left_at is NULL) or project leader without joining Project.members
+            # directly into main query, preventing member list corruption and pagination bugs
+            query = query.filter(
                 or_(
-                    Student.full_name.ilike(search),
-                    Student.student_code.ilike(search),
-                    Student.kana_name.ilike(search)
+                    db.query(ProjectMember)
+                    .join(Student, Student.id == ProjectMember.student_id)
+                    .filter(
+                        ProjectMember.project_id == Project.id,
+                        ProjectMember.left_at.is_(None),
+                        or_(
+                            Student.full_name.ilike(search),
+                            Student.student_code.ilike(search),
+                            Student.kana_name.ilike(search),
+                        )
+                    )
+                    .exists(),
+                    db.query(Student)
+                    .filter(
+                        Student.id == Project.leader_student_id,
+                        or_(
+                            Student.full_name.ilike(search),
+                            Student.student_code.ilike(search),
+                            Student.kana_name.ilike(search),
+                        )
+                    )
+                    .exists()
                 )
-            ).distinct() # Distinct is necessary because join might return duplicate projects
+            )
 
         total = query.count()
         items = (
