@@ -85,7 +85,10 @@ class TestWorkReports:
         assert empty.json()["data"]["current_year"] == year
         assert empty.json()["data"]["current_month"] == month
 
-        created = client.post("/api/v1/reports/me")
+        created = client.post(
+            "/api/v1/reports/me",
+            json={"title": "Test monthly report"},
+        )
         assert created.status_code == 200, created.text
         body = created.json()["data"]
         report_id = body["id"]
@@ -95,7 +98,10 @@ class TestWorkReports:
         assert body["month"] == month
         assert body["day_count"] == day_count
         assert body["student_code"] == linked_student.student_code
-        assert client.post("/api/v1/reports/me").status_code == 409
+        assert client.post(
+            "/api/v1/reports/me",
+            json={"title": "Another monthly report"},
+        ).status_code == 409
 
         _auth(client, admin_cookie)
         hidden = client.get(f"/api/v1/reports/{report_id}")
@@ -204,7 +210,7 @@ class TestWorkReports:
         assert own_item["status"] == "rejected"
         assert own_item["editable"] is True
         assert own_item["review_note"] == "時間を確認してください"
-        assert own_list.json()["data"]["can_add_current"] is False
+        assert own_list.json()["data"]["can_add_current"] is True
 
         resubmit = client.post(f"/api/v1/reports/me/{report_id}/submit")
         assert resubmit.status_code == 200, resubmit.text
@@ -227,7 +233,10 @@ class TestWorkReports:
         exported = client.get(f"/api/v1/reports/{report_id}/export")
         assert exported.status_code == 200
         assert "spreadsheetml" in exported.headers["content-type"]
-        assert f"UZ240001_{year}-{month:02d}.xlsx" in exported.headers["content-disposition"]
+        assert (
+            f"UZ240001_{year}-{month:02d}_Test%20monthly%20report.xlsx"
+            in exported.headers["content-disposition"]
+        )
         workbook = load_workbook(BytesIO(exported.content))
         sheet = workbook.active
         assert sheet["C3"].value == "UZ240001"
@@ -340,6 +349,7 @@ class TestSeikaHoukokushoBulkExport:
             student_id=linked_student.id,
             year=year,
             month=month,
+            title="Draft monthly report",
             status=ReportStatus.DRAFT,
             week_2="second week",
         )

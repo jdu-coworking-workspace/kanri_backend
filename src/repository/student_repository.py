@@ -32,6 +32,16 @@ class StudentRepository:
         return db.query(Student).filter(Student.email == email).first()
 
     @staticmethod
+    def get_memberships(db: Session, student_id: UUID) -> List[ProjectMember]:
+        return (
+            db.query(ProjectMember)
+            .options(joinedload(ProjectMember.project))
+            .filter(ProjectMember.student_id == student_id)
+            .order_by(ProjectMember.joined_at.asc())
+            .all()
+        )
+
+    @staticmethod
     def get_list(
         db: Session,
         page: int,

@@ -159,9 +159,10 @@ class TestStudentModel:
 
     def test_semester_enum_values(self):
         values = {s.value for s in SemesterEnum}
-        assert len(values) == 9
+        assert len(values) == 10
         assert "1-semestr" in values
         assert "9-semestr" in values
+        assert "卒業" in values
 
     def test_student_create_and_read(self, test_db):
         """Student DB'ga yoziladi va o'qiladi."""
