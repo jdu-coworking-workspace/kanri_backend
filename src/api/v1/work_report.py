@@ -2,6 +2,7 @@ from uuid import UUID
 
 # pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+
 # pyrefly: ignore [missing-import]
 from fastapi.responses import Response
 
@@ -11,10 +12,15 @@ from sqlalchemy.orm import Session
 from src.api.deps import get_current_user, require_admin, require_staff_or_admin
 from src.database.session import get_db
 from src.models.user import User
-from src.schemas.work_report import MonthlyReportUpdateIn, ReportReviewIn
+from src.schemas.work_report import (
+    MonthlyReportCreateIn,
+    MonthlyReportUpdateIn,
+    ReportReviewIn,
+)
 from src.services.work_report_service import WorkReportService
 from src.utils.report_excel import build_monthly_report_xlsx
 from src.utils.report_excel_batch import build_period_archive
+from urllib.parse import quote
 
 router = APIRouter()
 
@@ -29,10 +35,14 @@ def list_own_reports(
 
 @router.post("/me")
 def create_own_report(
+    payload: MonthlyReportCreateIn,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return {"success": True, "data": WorkReportService.create_current(db, current_user)}
+    return {
+        "success": True,
+        "data": WorkReportService.create_own(db, current_user, payload),
+    }
 
 
 @router.get("/me/{report_id}")
@@ -41,7 +51,10 @@ def get_own_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return {"success": True, "data": WorkReportService.get_own_by_id(db, current_user, report_id)}
+    return {
+        "success": True,
+        "data": WorkReportService.get_own_by_id(db, current_user, report_id),
+    }
 
 
 @router.put("/me/{report_id}")
@@ -63,7 +76,10 @@ def submit_own_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return {"success": True, "data": WorkReportService.submit_own(db, current_user, report_id)}
+    return {
+        "success": True,
+        "data": WorkReportService.submit_own(db, current_user, report_id),
+    }
 
 
 @router.get("")
@@ -88,13 +104,18 @@ def export_period(
     if not reports:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "REPORT_EXPORT_EMPTY", "message": "Bu oy uchun hisobot topilmadi"},
+            detail={
+                "code": "REPORT_EXPORT_EMPTY",
+                "message": "Bu oy uchun hisobot topilmadi",
+            },
         )
     content = build_period_archive(reports, year, month)
     return Response(
         content=content,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="reports_{year}-{month:02d}.zip"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="reports_{year}-{month:02d}.zip"'
+        },
     )
 
 
@@ -141,7 +162,10 @@ def export_report(
 ):
     report = WorkReportService.get_export_detail(db, report_id)
     content = build_monthly_report_xlsx(report)
-    filename = f"{report['student_code']}_{report['year']}-{report['month']:02d}.xlsx"
+    filename = (
+        f"{report['student_code']}_{report['year']}-{report['month']:02d}_"
+        f"{quote(report['title'], safe='-_')}.xlsx"
+    )
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

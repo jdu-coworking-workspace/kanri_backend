@@ -18,7 +18,9 @@ from src.schemas.student import (
     StudentCopySchema,
 )
 from src.utils.security import get_password_hash
+from src.utils.s3 import get_anonymous_avatar_url
 
+ANONYMOUS_AVATAR_URL = get_anonymous_avatar_url()
 
 class StudentService:
 
@@ -122,6 +124,8 @@ class StudentService:
         )
         payload = student_data.model_dump()
         payload["user_id"] = user.id
+        if not payload.get("avatar_url"):
+            payload["avatar_url"] = ANONYMOUS_AVATAR_URL
         student = StudentRepository.create(db, payload)
         StudentService._notify_password(plain_password)
         return student
@@ -192,7 +196,7 @@ class StudentService:
             "kana_name": copy_data.kana_name or source.kana_name,
             "student_code": copy_data.student_code,
             "email": copy_data.email,
-            "avatar_url": None,  # nusxada yangi avatar alohida yuklanadi
+            "avatar_url": ANONYMOUS_AVATAR_URL,  # nusxada yangi avatar alohida yuklanadi
             "grad_year_month": source.grad_year_month,
             "semester": source.semester,
             "skill_rank": source.skill_rank,

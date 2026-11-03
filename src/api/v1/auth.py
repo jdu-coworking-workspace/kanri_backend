@@ -7,7 +7,8 @@ from src.schemas.auth import ChangePasswordRequest, LoginRequest, UserOut
 from src.services.auth_service import authenticate_user, change_password
 # pyrefly: ignore [missing-import]
 from src.api.deps import get_db, get_current_user
-from src.models.user import User
+from src.models.user import User, UserRole
+from src.repository.student_repository import StudentRepository
 from src.config import settings
 
 router = APIRouter()
@@ -40,6 +41,15 @@ def _clear_auth_cookie(response: Response) -> None:
         path="/",
     )
 
+def _consume_first_login(db: Session, user: User) -> bool:
+    if UserRole.parse(user.role) is not UserRole.STUDENT:
+        return False
+    student = StudentRepository.get_by_user_id(db, user.id)
+    if student is None or not student.is_first_login:
+        return False
+    student.is_first_login = False  # type: ignore[assignment]
+    db.commit()
+    return True
 
 @router.post("/login")
 def login(
@@ -49,11 +59,13 @@ def login(
 ):
     user, token = authenticate_user(db, login_data)
     _set_auth_cookie(response, token)
+    is_first_login = _consume_first_login(db, user)
 
     return {
         "success": True,
         "data": {
-            "user": UserOut.model_validate(user)
+            "user": UserOut.model_validate(user),
+            "is_first_login": is_first_login,
         }
     }
 

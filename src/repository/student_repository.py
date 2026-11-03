@@ -41,10 +41,12 @@ class StudentRepository:
         work_status: Optional[WorkStatus] = None,
         semester: Optional[SemesterEnum] = None,
     ) -> Tuple[List[Student], int]:
-        query = db.query(Student).options(selectinload(Student.project_memberships))
+        query = db.query(Student).options(
+            selectinload(Student.project_memberships).joinedload(ProjectMember.project)
+        )
 
-        if q:
-            search = f"%{q}%"
+        if q and q.strip():
+            search = f"%{q.strip()}%"
             query = query.filter(
                 or_(
                     Student.full_name.ilike(search),
@@ -90,13 +92,3 @@ class StudentRepository:
     def delete(db: Session, student: Student) -> None:
         db.delete(student)
         db.commit()
-
-    @staticmethod
-    def get_memberships(db: Session, student_id: UUID) -> List:
-        return (
-            db.query(ProjectMember)
-            .options(joinedload(ProjectMember.project))
-            .filter(ProjectMember.student_id == student_id)
-            .order_by(ProjectMember.joined_at.desc())
-            .all()
-        )

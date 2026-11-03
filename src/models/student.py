@@ -1,10 +1,11 @@
 from enum import Enum
 # pyrefly: ignore [missing-import]
-from sqlalchemy import Column, String, Date, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, String, Date, Boolean, ForeignKey, Enum as SQLEnum
 # pyrefly: ignore [missing-import]
 from sqlalchemy.dialects.postgresql import UUID
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import expression
 from .base import Base, TimeStampsMixin, generate_uuid
 
 class SkillRank(str, Enum):
@@ -30,6 +31,7 @@ class SemesterEnum(str, Enum):
     SEMESTER_7 = "7-semestr"
     SEMESTER_8 = "8-semestr"
     SEMESTER_9 = "9-semestr"
+    GRADUATED = "卒業"
 
 class Student(Base, TimeStampsMixin):
     __tablename__ = "students"
@@ -46,6 +48,7 @@ class Student(Base, TimeStampsMixin):
         nullable=True,
     )
     avatar_url = Column(String(500), nullable=True)
+    is_first_login = Column(Boolean, nullable=False, default=True, server_default=expression.true())
     grad_year_month = Column(Date, nullable=True)
 
     semester = Column(SQLEnum(SemesterEnum), nullable=True)
@@ -62,4 +65,16 @@ class Student(Base, TimeStampsMixin):
 
     @property
     def concurrent_projects_count(self):
-        return len([pm for pm in self.project_memberships if pm.left_at is None])
+        count = 0
+        for pm in self.project_memberships:
+            if pm.left_at is None:
+                project = pm.project
+                if project and getattr(project, 'status', None):
+                    try:
+                        from src.models.project import ProjectStatus
+                        if project.status == ProjectStatus.DONE:
+                            continue
+                    except Exception:
+                        pass
+                count += 1
+        return count

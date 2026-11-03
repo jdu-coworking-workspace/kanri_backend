@@ -8,8 +8,10 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     SmallInteger,
+    String,
     Text,
     Time,
     UniqueConstraint,
@@ -56,7 +58,36 @@ class ReportStatus(str, Enum):
         return parsed
 
 
+class ReportType(str, Enum):
+    """API: hourly, output. PostgreSQL `reporttype` nomlarni saqlaydi: HOURLY, OUTPUT."""
+
+    HOURLY = "hourly"  # start/finish asosidagi hisobot
+    OUTPUT = "output"  # 成果制: ish vaqti + [条件1/2] soni
+
+    @classmethod
+    def try_parse(cls, value):
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, str):
+            key = value.strip().lower()
+            for member in cls:
+                if member.value == key or member.name.lower() == key:
+                    return member
+        return None
+
+    @classmethod
+    def parse(cls, value) -> "ReportType":
+        parsed = cls.try_parse(value)
+        if parsed is None:
+            raise ValueError(f"Unknown report type: {value!r}")
+        return parsed
+
+
 def _report_status_db_values(enum_cls):
+    return [member.name for member in enum_cls]
+
+
+def _report_type_db_values(enum_cls):
     return [member.name for member in enum_cls]
 
 
@@ -64,9 +95,14 @@ class MonthlyReport(Base, TimeStampsMixin):
     __tablename__ = "monthly_reports"
     __table_args__ = (
         UniqueConstraint(
-            "student_id", "year", "month", name="uq_monthly_reports_student_period"
+            "student_id",
+            "year",
+            "month",
+            "title",
+            name="uq_monthly_reports_student_period_title",
         ),
         CheckConstraint("month >= 1 AND month <= 12", name="ck_monthly_reports_month"),
+        Index("ix_monthly_reports_student_period", "student_id", "year", "month"),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
@@ -76,6 +112,25 @@ class MonthlyReport(Base, TimeStampsMixin):
         nullable=False,
         index=True,
     )
+    title = Column(String(255), nullable=False)
+    report_type = Column(
+        SQLEnum(
+            ReportType,
+            name="reporttype",
+            native_enum=True,
+            values_callable=_report_type_db_values,
+            validate_strings=True,
+        ),
+        nullable=False,
+        default=ReportType.HOURLY,
+        server_default="HOURLY",
+    )
+    # output start
+    condition_1_label = Column(String(100), nullable=True)
+    condition_2_label = Column(String(100), nullable=True)
+    unit_price_1 = Column(Integer, nullable=True)
+    unit_price_2 = Column(Integer, nullable=True)
+    # end
     year = Column(SmallInteger, nullable=False)
     month = Column(SmallInteger, nullable=False)
     status = Column(
@@ -132,5 +187,12 @@ class DailyReport(Base, TimeStampsMixin):
     finish_time = Column(Time, nullable=True)
     description = Column(Text, nullable=True)
     is_day_off = Column(Boolean, nullable=False, default=False)
+    # output report uchun quyidagi maydonlar ishlatiladi:
+    work_minutes = Column(Integer, nullable=True)
+    count_1 = Column(Integer, nullable=True)
+    count_2 = Column(Integer, nullable=True)
+    is_approved = Column(Boolean, nullable=True)
+    approved_count_1 = Column(Integer, nullable=True)
+    approved_count_2 = Column(Integer, nullable=True)
 
     monthly_report = relationship("MonthlyReport", back_populates="days")

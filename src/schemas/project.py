@@ -22,6 +22,7 @@ class ProjectBaseSchema(BaseModel):
     description: Optional[str] = Field(
         None, description="Loyiha haqida batafsil ma'lumot"
     )
+    image_url: Optional[str] = Field(None, max_length=1024)
 
 
 class ProjectCreateSchema(ProjectBaseSchema):
@@ -37,6 +38,7 @@ class ProjectUpdateSchema(BaseModel):
     category: Optional[ProjectCategory] = None
     leader_student_id: Optional[UUID] = None
     description: Optional[str] = None
+    image_url: Optional[str] = Field(None, max_length=1024)
 
 
 class ProjectMemberSimpleSchema(BaseModel):

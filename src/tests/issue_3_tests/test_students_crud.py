@@ -14,7 +14,8 @@ Testlar:
 # pyrefly: ignore [missing-import]
 import pytest
 from src.models import Student, ProjectMember
-
+from src.services.student_service import ANONYMOUS_AVATAR_URL
+"""Nusxada anonymous avatar qo'yiladi (original avatar nusxalanmaydi)."""
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # HELPERS
@@ -587,7 +588,7 @@ class TestCopyStudent:
             json={"student_code": "AV002", "email": "av2@t.com"},
         )
         assert resp.status_code == 201
-        assert resp.json()["data"]["avatar_url"] is None
+        assert resp.json()["data"]["avatar_url"] == ANONYMOUS_AVATAR_URL
 
     def test_copy_duplicate_code_returns_409(self, client, admin_cookie, sample_student):
         """Nusxada allaqachon mavjud student_code → 409."""
