@@ -2,7 +2,7 @@ from typing import Optional, List, Tuple
 from uuid import UUID
 
 # pyrefly: ignore [missing-import]
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from src.models.project_member import ProjectMember
 
 from src.models.student import SemesterEnum, SkillRank, Student, WorkStatus
+from src.models.user import User
 
 
 class StudentRepository:
@@ -102,3 +103,34 @@ class StudentRepository:
     def delete(db: Session, student: Student) -> None:
         db.delete(student)
         db.commit()
+
+    @staticmethod
+    def get_existing_student_codes(db: Session, codes: List[str]) -> set:
+        if not codes:
+            return set()
+        rows = (
+            db.query(Student.student_code).filter(Student.student_code.in_(codes)).all()
+        )
+        return {r[0] for r in rows}
+
+    @staticmethod
+    def get_existing_student_emails(db: Session, emails_lower: List[str]) -> set:
+        if not emails_lower:
+            return set()
+        rows = (
+            db.query(func.lower(Student.email))
+            .filter(func.lower(Student.email).in_(emails_lower))
+            .all()
+        )
+        return {r[0] for r in rows}
+
+    @staticmethod
+    def get_existing_user_emails(db: Session, emails_lower: List[str]) -> set:
+        if not emails_lower:
+            return set()
+        rows = (
+            db.query(func.lower(User.email))
+            .filter(func.lower(User.email).in_(emails_lower))
+            .all()
+        )
+        return {r[0] for r in rows}

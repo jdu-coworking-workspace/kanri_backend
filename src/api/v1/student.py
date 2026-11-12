@@ -13,6 +13,8 @@ from src.database.session import get_db
 from src.api.deps import get_current_user, require_admin
 from src.models.user import User
 from src.schemas.student import (
+    StudentBulkCreateSchema,
+    StudentBulkResultSchema,
     StudentCreateSchema,
     StudentUpdateSchema,
     StudentOutSchema,
@@ -158,3 +160,19 @@ def copy_student(
 ):
     student = StudentService.copy_student(db, student_id, copy_data)
     return {"success": True, "data": StudentOutSchema.model_validate(student)}
+
+
+@router.post(
+    "/bulk",
+    response_model=StudentBulkResultSchema,
+    status_code=status.HTTP_201_CREATED,
+)
+def bulk_create_students(
+    payload: StudentBulkCreateSchema,
+    skip_invalid: bool = Query(
+        False, description="True bo'lsa xatoli qatorlar o'tkazib yuboriladi"
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    return StudentService.bulk_create_students(db, payload.students, skip_invalid)
