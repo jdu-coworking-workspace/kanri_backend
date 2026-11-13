@@ -3,7 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 # pyrefly: ignore [missing-import]
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
@@ -23,6 +23,11 @@ from src.schemas.student import (
     StudentCopySchema,
 )
 from src.services.student_service import StudentService
+from src.utils.student_import import (
+    MAX_FILE_SIZE_BYTES,
+    StudentFileError,
+    read_template,
+)
 
 router = APIRouter()
 
@@ -176,3 +181,66 @@ def bulk_create_students(
     current_user: User = Depends(require_admin),
 ):
     return StudentService.bulk_create_students(db, payload.students, skip_invalid)
+
+
+# ─── GET /students/bulk/template/{file_format} ────────────────────────────────
+@router.get(
+    "/bulk/template/{file_format}",
+    summary="Talabalarni ommaviy qo'shish uchun template faylni yuklab olish",
+)
+def download_bulk_template(
+    file_format: str,
+    current_user: User = Depends(require_admin),
+):
+    try:
+        content, media_type, filename = read_template(file_format.lower())
+    except StudentFileError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": exc.code, "message": exc.message},
+        )
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ─── POST /students/bulk/upload ───────────────────────────────────────────────
+@router.post(
+    "/bulk/upload",
+    response_model=StudentBulkResultSchema,
+    status_code=status.HTTP_201_CREATED,
+    summary="To'ldirilgan .xlsx yoki .csv fayl orqali talabalarni ommaviy qo'shish",
+)
+async def bulk_upload_students(
+    file: UploadFile = File(..., description="students.xlsx yoki students.csv fayli"),
+    skip_invalid: bool = Form(
+        False, description="True bo'lsa xatoli qatorlar o'tkazib yuboriladi"
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail={
+                "code": "FILE_TOO_LARGE",
+                "message": f"Fayl hajmi {MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB dan oshmasligi kerak",
+            },
+        )
+
+    try:
+        return StudentService.bulk_create_from_file(
+            db, file.filename or "", content, skip_invalid
+        )
+    except StudentFileError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": exc.code,
+                "message": exc.message,
+                "errors": exc.errors,
+            },
+        )

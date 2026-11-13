@@ -20,6 +20,7 @@ from src.schemas.student import (
 )
 from src.utils.security import get_password_hash
 from src.utils.s3 import get_anonymous_avatar_url
+from src.utils.student_import import parse_student_file
 
 ANONYMOUS_AVATAR_URL = get_anonymous_avatar_url()
 
@@ -214,6 +215,17 @@ class StudentService:
         return student
 
     @staticmethod
+    def bulk_create_from_file(
+        db: Session,
+        filename: str,
+        content: bytes,
+        skip_invalid: bool = False,
+    ) -> dict:
+        """Yuklangan .xlsx/.csv faylni parse qilib, bulk yaratishni bajaradi."""
+        rows = parse_student_file(filename, content)
+        return StudentService.bulk_create_students(db, rows, skip_invalid)
+
+    @staticmethod
     def _clean_row(raw: Any) -> Dict[str, Any]:
         """Excel'dan kelgan bo'sh katak ("" yoki bo'sh joy) -> None, matnlarni strip qiladi."""
         if not isinstance(raw, dict):
@@ -358,6 +370,8 @@ class StudentService:
             for (_, data), user in zip(to_create, users):
                 payload = data.model_dump()
                 payload["user_id"] = user.id
+                if not payload.get("avatar_url"):
+                    payload["avatar_url"] = ANONYMOUS_AVATAR_URL
                 students.append(Student(**payload))
             db.add_all(students)
             db.flush()  # student.id olish uchun
