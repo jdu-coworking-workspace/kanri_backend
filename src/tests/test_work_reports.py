@@ -394,3 +394,213 @@ class TestSeikaHoukokushoBulkExport:
         empty = client.get("/api/v1/reports/export", params={"year": 2019, "month": 1})
         assert empty.status_code == 404
         assert empty.json()["detail"]["code"] == "REPORT_EXPORT_EMPTY"
+
+
+class TestOutputReport:
+    """成果制 (output) reports are paid per deliverable: days without work
+    stay empty instead of being forced to a day-off marker."""
+
+    def _output_days(self, year, month, worked=(2, 5)):
+        _, last_day = calendar.monthrange(year, month)
+        days = []
+        for day in range(1, last_day + 1):
+            work_date = date(year, month, day).isoformat()
+            if day in worked:
+                days.append(
+                    {
+                        "work_date": work_date,
+                        "is_day_off": False,
+                        "work_minutes": 120,
+                        "count_1": 4,
+                        "count_2": 1,
+                        "description": "deliverable",
+                    }
+                )
+            else:
+                days.append({"work_date": work_date, "is_day_off": False})
+        return days
+
+    def test_output_report_submits_without_filling_every_day(
+        self, client, linked_student, student_cookie, admin_cookie
+    ):
+        today = date.today()
+        year, month = today.year, today.month
+        _auth(client, student_cookie)
+        created = client.post(
+            "/api/v1/reports/me",
+            json={"title": "Output report", "report_type": "output"},
+        )
+        assert created.status_code == 200, created.text
+        report_id = created.json()["data"]["id"]
+        assert created.json()["data"]["report_type"] == "output"
+
+        saved = client.put(
+            f"/api/v1/reports/me/{report_id}",
+            json={"year": year, "month": month, "days": self._output_days(year, month)},
+        )
+        assert saved.status_code == 200, saved.text
+        body = saved.json()["data"]
+        assert body["total_minutes"] == 240
+        assert body["total_count_1"] == 8
+        assert body["total_count_2"] == 2
+        # Only the two worked days count towards progress.
+        assert body["filled_days"] == 2
+        assert body["entry_count"] == 2
+        assert body["day_count"] == calendar.monthrange(year, month)[1]
+
+        submitted = client.post(f"/api/v1/reports/me/{report_id}/submit")
+        assert submitted.status_code == 200, submitted.text
+        assert submitted.json()["data"]["status"] == "submitted"
+
+        _auth(client, admin_cookie)
+        detail = client.get(f"/api/v1/reports/{report_id}")
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["data"]["report_type"] == "output"
+
+        exported = client.get(f"/api/v1/reports/{report_id}/export")
+        assert exported.status_code == 200, exported.text
+        sheet = load_workbook(BytesIO(exported.content)).active
+        assert sheet.title == f"{month}月"
+        assert sheet["B2"].value == "成果報告書（成果制）"
+        assert sheet["C3"].value == linked_student.student_code
+        assert sheet["B6"].value.date() == date(year, month, 1)
+        # Day 1 was not worked: the row stays blank, no 休み marker.
+        assert sheet["C6"].value is None
+        assert sheet["D6"].value is None
+        assert sheet["F6"].value is None
+        # Day 2 was worked: minutes become a time value, counts are numbers.
+        assert sheet["C7"].value.hour == 2
+        assert sheet["D7"].value == 4
+        assert sheet["E7"].value == 1
+        assert sheet["F7"].value == "deliverable"
+
+    def test_output_report_requires_work_minutes_on_filled_days(
+        self, client, linked_student, student_cookie
+    ):
+        today = date.today()
+        year, month = today.year, today.month
+        _auth(client, student_cookie)
+        report_id = client.post(
+            "/api/v1/reports/me",
+            json={"title": "Output report", "report_type": "output"},
+        ).json()["data"]["id"]
+
+        days = self._output_days(year, month)
+        days[1]["work_minutes"] = 0
+        days[1]["count_1"] = 3
+        assert client.put(
+            f"/api/v1/reports/me/{report_id}",
+            json={"year": year, "month": month, "days": days},
+        ).status_code == 200
+        denied = client.post(f"/api/v1/reports/me/{report_id}/submit")
+        assert denied.status_code == 400
+        assert denied.json()["detail"]["code"] == "REPORT_INCOMPLETE"
+
+    def test_output_report_needs_at_least_one_entry(
+        self, client, linked_student, student_cookie
+    ):
+        today = date.today()
+        year, month = today.year, today.month
+        _auth(client, student_cookie)
+        report_id = client.post(
+            "/api/v1/reports/me",
+            json={"title": "Output report", "report_type": "output"},
+        ).json()["data"]["id"]
+        assert client.put(
+            f"/api/v1/reports/me/{report_id}",
+            json={"year": year, "month": month, "days": self._output_days(year, month, worked=())},
+        ).status_code == 200
+        denied = client.post(f"/api/v1/reports/me/{report_id}/submit")
+        assert denied.status_code == 400
+        assert denied.json()["detail"]["code"] == "REPORT_INCOMPLETE"
+
+    def test_output_report_keeps_condition_labels_null_for_translation(
+        self, client, linked_student, student_cookie
+    ):
+        """Default labels must stay null so the UI can translate them."""
+        _auth(client, student_cookie)
+        created = client.post(
+            "/api/v1/reports/me",
+            json={"title": "Output report", "report_type": "output"},
+        )
+        assert created.status_code == 200, created.text
+        body = created.json()["data"]
+        assert body["condition_1_label"] is None
+        assert body["condition_2_label"] is None
+
+        report_id = body["id"]
+        today = date.today()
+        cleared = client.put(
+            f"/api/v1/reports/me/{report_id}",
+            json={
+                "year": today.year,
+                "month": today.month,
+                "condition_1_label": "Editing",
+                "condition_2_label": "Design",
+            },
+        )
+        assert cleared.status_code == 200, cleared.text
+        assert cleared.json()["data"]["condition_1_label"] == "Editing"
+
+        # An empty string clears a custom label instead of keeping the old one.
+        reset = client.put(
+            f"/api/v1/reports/me/{report_id}",
+            json={
+                "year": today.year,
+                "month": today.month,
+                "condition_1_label": "",
+                "condition_2_label": "",
+            },
+        )
+        assert reset.status_code == 200, reset.text
+        assert reset.json()["data"]["condition_1_label"] is None
+        assert reset.json()["data"]["condition_2_label"] is None
+
+    def test_output_report_rejects_values_above_backend_limits(
+        self, client, linked_student, student_cookie
+    ):
+        today = date.today()
+        year, month = today.year, today.month
+        _auth(client, student_cookie)
+        report_id = client.post(
+            "/api/v1/reports/me",
+            json={"title": "Output report", "report_type": "output"},
+        ).json()["data"]["id"]
+
+        too_many_minutes = self._output_days(year, month)
+        too_many_minutes[1]["work_minutes"] = 1441
+        assert client.put(
+            f"/api/v1/reports/me/{report_id}",
+            json={"year": year, "month": month, "days": too_many_minutes},
+        ).status_code == 422
+
+        too_many_deliverables = self._output_days(year, month)
+        too_many_deliverables[1]["count_1"] = 100001
+        assert client.put(
+            f"/api/v1/reports/me/{report_id}",
+            json={"year": year, "month": month, "days": too_many_deliverables},
+        ).status_code == 422
+
+    def test_memo_longer_than_2000_characters_is_rejected(
+        self, client, linked_student, student_cookie
+    ):
+        today = date.today()
+        year, month = today.year, today.month
+        _auth(client, student_cookie)
+        report_id = client.post(
+            "/api/v1/reports/me",
+            json={"title": "Hourly report"},
+        ).json()["data"]["id"]
+
+        days = _month_days(year, month, complete=True)
+        days[1]["description"] = "x" * 2001
+        assert client.put(
+            f"/api/v1/reports/me/{report_id}",
+            json={"year": year, "month": month, "days": days},
+        ).status_code == 422
+
+        days[1]["description"] = "x" * 2000
+        assert client.put(
+            f"/api/v1/reports/me/{report_id}",
+            json={"year": year, "month": month, "days": days},
+        ).status_code == 200

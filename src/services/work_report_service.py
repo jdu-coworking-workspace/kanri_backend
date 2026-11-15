@@ -21,8 +21,6 @@ from src.schemas.work_report import (
 from src.services.student_service import StudentService
 
 MAX_REPORTS_PER_MONTH = 2
-OUTPUT_CONDITION_1_LABEL = "[条件１]"
-OUTPUT_CONDITION_2_LABEL = "[条件２]"
 
 
 def _error(status_code: int, code: str, message: str) -> None:
@@ -107,6 +105,37 @@ def day_is_complete(day: DailyReport, report_type) -> bool:
     return duration_minutes(day.start_time, day.finish_time) > 0
 
 
+def day_has_output_data(day: DailyReport) -> bool:
+    """Output (成果制) kunlari ixtiyoriy: faqat ma'lumot kiritilgan kunlar hisobga olinadi."""
+    return bool(
+        (day.work_minutes or 0) > 0
+        or (day.count_1 or 0) > 0
+        or (day.count_2 or 0) > 0
+        or _blank(day.description)
+    )
+
+
+def report_progress(days, report_type, year: int, month: int) -> dict:
+    """Hisobot to'ldirilish ko'rsatkichlari.
+
+    hourly: oyning barcha kalendar kunlari talab qilinadi.
+    output: ishbay — faqat ma'lumot kiritilgan kunlar hisobga olinadi.
+    """
+    calendar_days = len(month_dates(year, month))
+    if _is_output(report_type):
+        entries = [day for day in days if day_has_output_data(day)]
+        return {
+            "day_count": calendar_days,
+            "entry_count": len(entries),
+            "filled_days": sum(1 for day in entries if day_is_complete(day, report_type)),
+        }
+    return {
+        "day_count": calendar_days,
+        "entry_count": calendar_days,
+        "filled_days": sum(1 for day in days if day_is_complete(day, report_type)),
+    }
+
+
 def serialize_day(day: DailyReport, report_type) -> dict:
     output = _is_output(report_type)
     overnight = False
@@ -137,6 +166,7 @@ def serialize_report(report: MonthlyReport) -> dict:
     rtype = ReportType.parse(report.report_type)
     day_rows = [serialize_day(day, rtype) for day in days]
     total = sum(row["duration_minutes"] for row in day_rows)
+    progress = report_progress(days, rtype, report.year, report.month)
     status_value = ReportStatus.parse(report.status).value
     student = report.student
     return {
@@ -169,8 +199,9 @@ def serialize_report(report: MonthlyReport) -> dict:
         "total_minutes": total,
         "total_count_1": sum(d.count_1 or 0 for d in days),
         "total_count_2": sum(d.count_2 or 0 for d in days),
-        "filled_days": sum(1 for day in days if day_is_complete(day, rtype)),
-        "day_count": len(month_dates(report.year, report.month)),
+        "filled_days": progress["filled_days"],
+        "day_count": progress["day_count"],
+        "entry_count": progress["entry_count"],
         "days": day_rows,
     }
 
@@ -197,6 +228,7 @@ def serialize_list_item(
     rtype = ReportType.parse(report.report_type)
     days = list(report.days)
     total = sum(day_minutes(day, rtype) for day in days)
+    progress = report_progress(days, rtype, year, month)
     return {
         "student_id": str(student.id),
         "title": report.title,
@@ -207,8 +239,9 @@ def serialize_list_item(
         "report_id": str(report.id),
         "status": ReportStatus.parse(report.status).value,
         "total_minutes": total,
-        "filled_days": sum(1 for day in days if day_is_complete(day, rtype)),
-        "day_count": day_count,
+        "filled_days": progress["filled_days"],
+        "day_count": progress["day_count"],
+        "entry_count": progress["entry_count"],
         "stipend_amount": report.stipend_amount,
     }
 
@@ -217,6 +250,7 @@ def serialize_own_summary(report: MonthlyReport) -> dict:
     rtype = ReportType.parse(report.report_type)
     days = list(report.days)
     status_value = ReportStatus.parse(report.status).value
+    progress = report_progress(days, rtype, report.year, report.month)
     return {
         "id": str(report.id),
         "title": report.title,
@@ -229,8 +263,9 @@ def serialize_own_summary(report: MonthlyReport) -> dict:
         "review_note": report.review_note,
         "stipend_amount": report.stipend_amount,
         "total_minutes": sum(day_minutes(day, rtype) for day in days),
-        "filled_days": sum(1 for day in days if day_is_complete(day, rtype)),
-        "day_count": len(month_dates(report.year, report.month)),
+        "filled_days": progress["filled_days"],
+        "day_count": progress["day_count"],
+        "entry_count": progress["entry_count"],
         "submitted_at": _iso(report.submitted_at),
         "reviewed_at": _iso(report.reviewed_at),
         "updated_at": _iso(report.updated_at),
@@ -284,16 +319,9 @@ class WorkReportService:
             student_id=student.id,
             title=payload.title,
             report_type=payload.report_type,
-            condition_1_label=(
-                _blank(payload.condition_1_label) or OUTPUT_CONDITION_1_LABEL
-                if is_output
-                else None
-            ),
-            condition_2_label=(
-                _blank(payload.condition_2_label) or OUTPUT_CONDITION_2_LABEL
-                if is_output
-                else None
-            ),
+            # Default label saqlanmaydi: frontend uni joriy tilga tarjima qiladi.
+            condition_1_label=_blank(payload.condition_1_label) if is_output else None,
+            condition_2_label=_blank(payload.condition_2_label) if is_output else None,
             year=year,
             month=month,
             status=ReportStatus.DRAFT,
@@ -387,7 +415,8 @@ class WorkReportService:
         if _blank(payload.title):
             report.title = _blank(payload.title)
         if output:
-            if _blank(payload.condition_1_label):
+            # None = o'zgartirilmaydi, bo'sh string = tozalash (frontend tarjimaga fallback qiladi).
+            if payload.condition_1_label is not None:
                 report.condition_1_label = _blank(payload.condition_1_label)
             if payload.condition_2_label is not None:
                 report.condition_2_label = _blank(payload.condition_2_label)
@@ -471,15 +500,31 @@ class WorkReportService:
                 _reject_time_order(day.start_time, day.finish_time)
 
         days = {day.work_date: day for day in report.days}
-        for work_date in month_dates(report.year, report.month):
-            day = days.get(work_date)
-            if day is None or not day_is_complete(day, rtype):
-                message = (
-                    "Oy ichidagi har bir kun dam olish yoki ish vaqti bilan to'ldirilishi kerak"
-                    if rtype is ReportType.OUTPUT
-                    else "Oy ichidagi har bir kun dam olish yoki start, finish, memo va soat bilan to'ldirilishi kerak"
+        if rtype is ReportType.OUTPUT:
+            # 成果制: ishbay bo'lgani uchun oyning barcha kunlari shart emas.
+            # Faqat ma'lumot kiritilgan kunlar to'liq bo'lishi kerak.
+            if not any(day_has_output_data(day) for day in report.days):
+                _error(
+                    status.HTTP_400_BAD_REQUEST,
+                    "REPORT_INCOMPLETE",
+                    "Kamida bitta kun uchun ish vaqti yoki natija kiritilishi kerak",
                 )
-                _error(status.HTTP_400_BAD_REQUEST, "REPORT_INCOMPLETE", message)
+            for day in report.days:
+                if day_has_output_data(day) and not day_is_complete(day, rtype):
+                    _error(
+                        status.HTTP_400_BAD_REQUEST,
+                        "REPORT_INCOMPLETE",
+                        "Ma'lumot kiritilgan har bir kunda ish vaqti (daqiqa) bo'lishi kerak",
+                    )
+        else:
+            for work_date in month_dates(report.year, report.month):
+                day = days.get(work_date)
+                if day is None or not day_is_complete(day, rtype):
+                    _error(
+                        status.HTTP_400_BAD_REQUEST,
+                        "REPORT_INCOMPLETE",
+                        "Oy ichidagi har bir kun dam olish yoki start, finish, memo va soat bilan to'ldirilishi kerak",
+                    )
 
         report.status = ReportStatus.SUBMITTED
         report.submitted_at = datetime.utcnow()

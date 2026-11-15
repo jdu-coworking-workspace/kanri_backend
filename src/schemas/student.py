@@ -1,6 +1,6 @@
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import date, datetime
 
@@ -73,3 +73,33 @@ class StudentHistoryItemSchema(BaseModel):
 
 class StudentDetailSchema(StudentOutSchema):
     history: List[StudentHistoryItemSchema] = []
+
+
+class StudentBulkCreateSchema(BaseModel):
+    # Qatorlar dict sifatida qabul qilinadi, har biri service ichida alohida
+    # validatsiya qilinadi (shunda xato qaysi qatorda ekani aniq qaytadi).
+    # Frontend ixtiyoriy "row" (Excel qator raqami) yuborishi mumkin, javobda shu qaytadi.
+    students: List[Dict[str, Any]] = Field(..., min_length=1, max_length=500)
+
+
+class StudentBulkCreatedItemSchema(BaseModel):
+    row: int
+    id: UUID
+    student_code: str
+    email: EmailStr
+    full_name: str
+
+
+class StudentBulkRowErrorSchema(BaseModel):
+    row: int
+    student_code: Optional[str] = None
+    email: Optional[str] = None
+    errors: List[str]
+
+
+class StudentBulkResultSchema(BaseModel):
+    total: int
+    created_count: int
+    failed_count: int
+    created: List[StudentBulkCreatedItemSchema]
+    errors: List[StudentBulkRowErrorSchema]
