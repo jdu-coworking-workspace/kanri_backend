@@ -215,7 +215,7 @@ sudo apt update && sudo apt upgrade -y
 sudo apt install -y git nginx postgresql postgresql-contrib \
   python3-venv python3-pip curl ufw rsync unzip
 
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt install -y nodejs
 sudo npm install -g pm2
 sudo apt install -y certbot python3-certbot-nginx
