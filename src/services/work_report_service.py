@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from src.models.student import Student
 from src.models.user import User
 from src.models.work_report import DailyReport, MonthlyReport, ReportStatus, ReportType
-from src.repository.work_report_repository import WorkReportRepository
+from src.repository.work_report_repository import STATUS_NAMES, WorkReportRepository
 from src.schemas.work_report import (
     MonthlyReportCreateIn,
     MonthlyReportUpdateIn,
@@ -271,6 +271,57 @@ def serialize_own_summary(report: MonthlyReport) -> dict:
         "updated_at": _iso(report.updated_at),
     }
 
+def serialize_search_item(
+    student: Student,
+    report: MonthlyReport | None,
+    total_minutes: int,
+    filled_days: int,
+    output_entries: int,
+    day_count: int,
+) -> dict:
+    """Admin ro'yxati qatori. Soat va kunlar SQL'da hisoblangan (Python'da emas)."""
+    if report is None:
+        return {
+            "student_id": str(student.id),
+            "title": None,
+            "report_type": None,
+            "student_name": student.full_name,
+            "student_code": student.student_code,
+            "email": student.email,
+            "report_id": None,
+            "status": None,
+            "total_minutes": 0,
+            "filled_days": 0,
+            "day_count": day_count,
+            "entry_count": 0,
+            "stipend_amount": None,
+            "submitted_at": None,
+            "reviewed_at": None,
+            "updated_at": None,
+            "can_open": False,
+        }
+    rtype = ReportType.parse(report.report_type)
+    status_value = ReportStatus.parse(report.status).value
+    return {
+        "student_id": str(student.id),
+        "title": report.title,
+        "report_type": rtype.value,
+        "student_name": student.full_name,
+        "student_code": student.student_code,
+        "email": student.email,
+        "report_id": str(report.id),
+        "status": status_value,
+        "total_minutes": int(total_minutes or 0),
+        "filled_days": int(filled_days or 0),
+        "day_count": day_count,
+        "entry_count": int(output_entries or 0) if rtype is ReportType.OUTPUT else day_count,
+        "stipend_amount": report.stipend_amount,
+        "submitted_at": _iso(report.submitted_at),
+        "reviewed_at": _iso(report.reviewed_at),
+        "updated_at": _iso(report.updated_at),
+        # draft qatorni ochib bo'lmaydi (REPORT_DRAFT_HIDDEN), frontend "Ochish" ni yashiradi
+        "can_open": status_value != ReportStatus.DRAFT.value,
+    }
 
 def notify_report_decision(
     email: str, year: int, month: int, decision: str, note: str | None
@@ -558,6 +609,81 @@ class WorkReportService:
                 serialize_list_item(student, report, year, month)
                 for student, report in rows
             ],
+        }
+    
+    @staticmethod
+    def _check_filters(
+        statuses: list[str], report_types: list[str], attention: str | None
+    ) -> None:
+        bad_status = [s for s in statuses if s not in STATUS_NAMES]
+        bad_type = [t for t in report_types if t not in ("hourly", "output", "none")]
+        if bad_status or bad_type:
+            _error(
+                status.HTTP_400_BAD_REQUEST,
+                "REPORT_FILTER_INVALID",
+                "Noto'g'ri filter qiymati",
+            )
+        only_not_created = bool(statuses) and set(statuses) == {"not_created"}
+        wants_report = any(t != "none" for t in report_types) or attention is not None
+        only_none_type = bool(report_types) and set(report_types) == {"none"}
+        wants_real_status = any(s != "not_created" for s in statuses) or attention is not None
+        if (only_not_created and wants_report) or (only_none_type and wants_real_status):
+            _error(
+                status.HTTP_400_BAD_REQUEST,
+                "REPORT_FILTER_CONFLICT",
+                "Bu filtrlar birga ishlamaydi: natija har doim bo'sh bo'ladi",
+            )
+
+    @staticmethod
+    def search_period(
+        db: Session,
+        year: int,
+        month: int,
+        *,
+        q: str | None = None,
+        statuses: list[str] | None = None,
+        report_types: list[str] | None = None,
+        project_id: UUID | None = None,
+        attention: str | None = None,
+        sort: str = "name",
+        order: str = "asc",
+        page: int = 1,
+        limit: int = 20,
+    ) -> dict:
+        statuses = statuses or []
+        report_types = report_types or []
+        WorkReportService._check_filters(statuses, report_types, attention)
+        result = WorkReportRepository.search_period(
+            db,
+            year,
+            month,
+            q=q,
+            statuses=statuses or None,
+            report_types=report_types or None,
+            project_id=project_id,
+            attention=attention,
+            sort=sort,
+            order=order,
+            page=page,
+            limit=limit,
+        )
+        day_count = result["day_count"]
+        items = [
+            serialize_search_item(student, report, minutes, filled, entries, day_count)
+            for student, report, minutes, filled, entries in result["rows"]
+        ]
+        total = result["total"]
+        return {
+            "year": year,
+            "month": month,
+            "periods": WorkReportService.available_periods(db),
+            "items": items,
+            "total": total,
+            "total_students": result["total_students"],
+            "page": page,
+            "limit": limit,
+            "total_pages": max(1, -(-total // limit)),
+            "status_counts": result["status_counts"],
         }
 
     @staticmethod

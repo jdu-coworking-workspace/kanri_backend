@@ -86,10 +86,38 @@ def submit_own_report(
 def list_reports(
     year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
+    q: str | None = Query(None, max_length=100),
+    status_filter: list[str] = Query(default=[], alias="status"),
+    report_type: list[str] = Query(default=[]),
+    project_id: UUID | None = None,
+    attention: str | None = Query(None, pattern="^(submitted_stale|rejected)$"),
+    sort: str = Query(
+        "name",
+        pattern="^(name|total_hours|status|updated_at|submitted_at|completion)$",
+    ),
+    order: str = Query("asc", pattern="^(asc|desc)$"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_staff_or_admin),
 ):
-    return {"success": True, "data": WorkReportService.list_period(db, year, month)}
+    return {
+        "success": True,
+        "data": WorkReportService.search_period(
+            db,
+            year,
+            month,
+            q=q,
+            statuses=status_filter,
+            report_types=report_type,
+            project_id=project_id,
+            attention=attention,
+            sort=sort,
+            order=order,
+            page=page,
+            limit=limit,
+        ),
+    }
 
 
 # Declared before "/{report_id}" so the literal path wins over the UUID route.
