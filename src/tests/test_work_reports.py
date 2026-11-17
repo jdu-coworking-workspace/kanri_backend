@@ -1,11 +1,12 @@
 import calendar
-from datetime import date, time
+from datetime import date, time, timedelta
 from io import BytesIO
 
 import pytest
 from openpyxl import load_workbook
 
 from src.models.student import Student
+from src.models.work_report import DailyReport, MonthlyReport, ReportStatus
 
 
 def _auth(client, cookie):
@@ -604,3 +605,133 @@ class TestOutputReport:
             f"/api/v1/reports/me/{report_id}",
             json={"year": year, "month": month, "days": days},
         ).status_code == 200
+
+
+class TestStudentReportHistory:
+    def test_student_exports_own_report_in_admin_format(
+        self, client, linked_student, student_cookie, admin_cookie
+    ):
+        today = date.today()
+        year, month = today.year, today.month
+        _auth(client, student_cookie)
+        report_id = client.post(
+            "/api/v1/reports/me", json={"title": "History report"}
+        ).json()["data"]["id"]
+        assert client.put(
+            f"/api/v1/reports/me/{report_id}",
+            json=_payload(year, month, complete=True),
+        ).status_code == 200
+
+        own = client.get(f"/api/v1/reports/me/{report_id}/export")
+        assert own.status_code == 200, own.text
+        assert "spreadsheetml" in own.headers["content-type"]
+        expected_name = (
+            f"{linked_student.student_code}_{year}-{month:02d}_"
+            "History%20report.xlsx"
+        )
+        assert f'attachment; filename="{expected_name}"' == own.headers[
+            "content-disposition"
+        ]
+
+        sheet = load_workbook(BytesIO(own.content)).active
+        assert sheet["B2"].value == "成果報告書（固定制）　勤務記録表"
+        assert sheet["C3"].value == linked_student.student_code
+        assert sheet["C4"].value == linked_student.full_name
+        assert sheet["E7"].value == "=D7-C7"
+        assert sheet["C41"].value == "week one"
+
+        _auth(client, admin_cookie)
+        admin = client.get(f"/api/v1/reports/{report_id}/export")
+        assert admin.status_code == 200, admin.text
+        assert admin.headers["content-disposition"] == own.headers["content-disposition"]
+        assert load_workbook(BytesIO(admin.content)).active["C3"].value == sheet[
+            "C3"
+        ].value
+
+    def test_student_cannot_export_another_students_report(
+        self, client, test_db, linked_student, student_cookie, admin_cookie
+    ):
+        today = date.today()
+        other = Student(
+            full_name="Other Student",
+            kana_name="アザー",
+            student_code="UZ999999",
+            email="other@test.com",
+            skill_rank="A",
+            work_status="active",
+        )
+        test_db.add(other)
+        test_db.flush()
+        foreign = MonthlyReport(
+            student_id=other.id,
+            year=today.year,
+            month=today.month,
+            title="Foreign report",
+            status=ReportStatus.DRAFT,
+        )
+        test_db.add(foreign)
+        test_db.commit()
+        test_db.refresh(foreign)
+
+        _auth(client, student_cookie)
+        response = client.get(f"/api/v1/reports/me/{foreign.id}/export")
+        assert response.status_code == 404
+        assert response.json()["detail"]["code"] == "REPORT_NOT_FOUND"
+
+        _auth(client, admin_cookie)
+        response = client.get(f"/api/v1/reports/me/{foreign.id}/export")
+        assert response.status_code == 403
+        assert response.json()["detail"]["code"] == "REPORT_EXPORT_FORBIDDEN"
+
+        client.cookies.clear()
+        response = client.get(f"/api/v1/reports/me/{foreign.id}/export")
+        assert response.status_code == 401
+
+    def test_past_month_report_is_readonly_but_exportable(
+        self, client, test_db, linked_student, student_cookie
+    ):
+        today = date.today()
+        previous = today.replace(day=1) - timedelta(days=1)
+        report = MonthlyReport(
+            student_id=linked_student.id,
+            year=previous.year,
+            month=previous.month,
+            title="Old report",
+            status=ReportStatus.DRAFT,
+        )
+        test_db.add(report)
+        test_db.flush()
+        test_db.add(
+            DailyReport(
+                monthly_report_id=report.id,
+                work_date=previous,
+                is_day_off=True,
+            )
+        )
+        test_db.commit()
+        test_db.refresh(report)
+
+        _auth(client, student_cookie)
+        blocked_update = client.put(
+            f"/api/v1/reports/me/{report.id}",
+            json=_payload(previous.year, previous.month, complete=True),
+        )
+        assert blocked_update.status_code == 400
+        assert blocked_update.json()["detail"]["code"] == "REPORT_PAST_MONTH"
+
+        blocked_submit = client.post(f"/api/v1/reports/me/{report.id}/submit")
+        assert blocked_submit.status_code == 400
+        assert blocked_submit.json()["detail"]["code"] == "REPORT_PAST_MONTH"
+
+        own = client.get("/api/v1/reports/me").json()["data"]
+        item = next(row for row in own["items"] if row["id"] == str(report.id))
+        assert (item["year"], item["month"]) == (previous.year, previous.month)
+        assert item["status"] == "draft"
+        assert item["editable"] is False
+        detail = client.get(f"/api/v1/reports/me/{report.id}").json()["data"]
+        assert detail["editable"] is False
+
+        exported = client.get(f"/api/v1/reports/me/{report.id}/export")
+        assert exported.status_code == 200, exported.text
+        sheet = load_workbook(BytesIO(exported.content)).active
+        assert sheet["C3"].value == linked_student.student_code

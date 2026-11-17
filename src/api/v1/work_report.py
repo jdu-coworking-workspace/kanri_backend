@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from src.api.deps import get_current_user, require_admin, require_staff_or_admin
 from src.database.session import get_db
-from src.models.user import User
+from src.models.user import User, UserRole
 from src.schemas.work_report import (
     MonthlyReportCreateIn,
     MonthlyReportUpdateIn,
@@ -23,6 +23,19 @@ from src.utils.report_excel_batch import build_period_archive
 from urllib.parse import quote
 
 router = APIRouter()
+
+
+def _xlsx_response(report: dict) -> Response:
+    content = build_monthly_report_xlsx(report)
+    filename = (
+        f"{report['student_code']}_{report['year']}-{report['month']:02d}_"
+        f"{quote(report['title'], safe='-_')}.xlsx"
+    )
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/me")
@@ -80,6 +93,23 @@ def submit_own_report(
         "success": True,
         "data": WorkReportService.submit_own(db, current_user, report_id),
     }
+
+
+@router.get("/me/{report_id}/export")
+def export_own_report(
+    report_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if UserRole.parse(current_user.role) is not UserRole.STUDENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "REPORT_EXPORT_FORBIDDEN",
+                "message": "Faqat o'z hisobotingizni yuklab olishingiz mumkin",
+            },
+        )
+    return _xlsx_response(WorkReportService.get_own_by_id(db, current_user, report_id))
 
 
 @router.get("")
@@ -161,13 +191,4 @@ def export_report(
     current_user: User = Depends(require_admin),
 ):
     report = WorkReportService.get_export_detail(db, report_id)
-    content = build_monthly_report_xlsx(report)
-    filename = (
-        f"{report['student_code']}_{report['year']}-{report['month']:02d}_"
-        f"{quote(report['title'], safe='-_')}.xlsx"
-    )
-    return Response(
-        content=content,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    return _xlsx_response(report)

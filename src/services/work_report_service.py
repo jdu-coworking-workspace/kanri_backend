@@ -50,6 +50,24 @@ def assert_not_future(year: int, month: int) -> None:
         )
 
 
+def assert_not_past(year: int, month: int) -> None:
+    today = date.today()
+    if (year, month) < (today.year, today.month):
+        _error(
+            status.HTTP_400_BAD_REQUEST,
+            "REPORT_PAST_MONTH",
+            "O'tgan oy hisobotini o'zgartirib bo'lmaydi",
+        )
+
+
+def report_is_editable(status_value: str, year: int, month: int) -> bool:
+    today = date.today()
+    return (
+        status_value in (ReportStatus.DRAFT.value, ReportStatus.REJECTED.value)
+        and (year, month) >= (today.year, today.month)
+    )
+
+
 def duration_minutes(
     start: time | None, finish: time | None, is_day_off: bool = False
 ) -> int:
@@ -184,8 +202,7 @@ def serialize_report(report: MonthlyReport) -> dict:
         "year": report.year,
         "month": report.month,
         "status": status_value,
-        "editable": status_value
-        in (ReportStatus.DRAFT.value, ReportStatus.REJECTED.value),
+        "editable": report_is_editable(status_value, report.year, report.month),
         "week_1": report.week_1,
         "week_2": report.week_2,
         "week_3": report.week_3,
@@ -258,8 +275,7 @@ def serialize_own_summary(report: MonthlyReport) -> dict:
         "year": report.year,
         "month": report.month,
         "status": status_value,
-        "editable": status_value
-        in (ReportStatus.DRAFT.value, ReportStatus.REJECTED.value),
+        "editable": report_is_editable(status_value, report.year, report.month),
         "review_note": report.review_note,
         "stipend_amount": report.stipend_amount,
         "total_minutes": sum(day_minutes(day, rtype) for day in days),
@@ -403,6 +419,7 @@ class WorkReportService:
     ) -> dict:
         report = WorkReportService._own(db, user, report_id)
         WorkReportService._ensure_editable(report)
+        assert_not_past(report.year, report.month)
         output = _is_output(report.report_type)
 
         if payload.year != report.year or payload.month != report.month:
@@ -493,6 +510,7 @@ class WorkReportService:
     def submit_own(db: Session, user: User, report_id: UUID) -> dict:
         report = WorkReportService._own(db, user, report_id)
         WorkReportService._ensure_editable(report)
+        assert_not_past(report.year, report.month)
         rtype = ReportType.parse(report.report_type)
 
         if rtype is ReportType.HOURLY:
