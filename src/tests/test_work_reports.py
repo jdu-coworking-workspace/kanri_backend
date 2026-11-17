@@ -606,7 +606,6 @@ class TestOutputReport:
             json={"year": year, "month": month, "days": days},
         ).status_code == 200
 
-
 class TestStudentReportHistory:
     def test_student_exports_own_report_in_admin_format(
         self, client, linked_student, student_cookie, admin_cookie
@@ -735,3 +734,4 @@ class TestStudentReportHistory:
         assert exported.status_code == 200, exported.text
         sheet = load_workbook(BytesIO(exported.content)).active
         assert sheet["C3"].value == linked_student.student_code
+
