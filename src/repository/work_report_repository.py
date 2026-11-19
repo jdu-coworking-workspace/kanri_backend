@@ -28,7 +28,10 @@ _HOURLY_MINUTES = case(
         ),
         0,
     ),
-    (_minutes_of(DailyReport.finish_time) < _minutes_of(DailyReport.start_time), 0),
+    (
+        _minutes_of(DailyReport.finish_time) < _minutes_of(DailyReport.start_time),
+        1440 - _minutes_of(DailyReport.start_time) + _minutes_of(DailyReport.finish_time),
+    ),
     else_=_minutes_of(DailyReport.finish_time) - _minutes_of(DailyReport.start_time),
 )
 _OUTPUT_MINUTES = case(

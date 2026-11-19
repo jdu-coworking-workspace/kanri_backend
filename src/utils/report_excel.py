@@ -90,6 +90,8 @@ def build_hourly_report_xlsx(report: dict) -> bytes:
     for offset in range(MAX_DAY_SLOTS):
         row = DAY_START_ROW + offset
         day_number = offset + 1
+        # Soat ustuni: tungi smenada (tugash < boshlanish) manfiy bo'lmasligi uchun MOD
+        set_cell(sheet, row, 5, f"=MOD(D{row}-C{row},1)")
         if day_number > last_day:
             set_cell(sheet, row, 2, None)
             set_cell(sheet, row, 3, time(0, 0))

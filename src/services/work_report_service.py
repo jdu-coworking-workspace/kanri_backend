@@ -21,6 +21,7 @@ from src.schemas.work_report import (
 from src.services.student_service import StudentService
 
 MAX_REPORTS_PER_MONTH = 2
+MAX_DAY_MINUTES = 9 * 60  # bir kunlik maksimum ish vaqti (9 soat)
 
 
 def _error(status_code: int, code: str, message: str) -> None:
@@ -58,16 +59,30 @@ def duration_minutes(
     start_m = start.hour * 60 + start.minute
     finish_m = finish.hour * 60 + finish.minute
     if finish_m < start_m:
-        return 0
+        # tungi smena: yarim tundan o'tadi (22:00 -> 02:00 = 240 daqiqa)
+        return 24 * 60 - start_m + finish_m
     return finish_m - start_m
 
 
-def _reject_time_order(start: time | None, finish: time | None) -> None:
-    if start is not None and finish is not None and start > finish:
+def _reject_bad_day(entry, output: bool) -> None:
+    """Bir kunlik yozuv qoidalari: 00:00 da boshlanmaydi, 9 soatdan oshmaydi."""
+    if entry.is_day_off:
+        return
+    if output:
+        minutes = entry.work_minutes or 0
+    else:
+        if entry.start_time is not None and entry.start_time == time(0, 0):
+            _error(
+                status.HTTP_400_BAD_REQUEST,
+                "REPORT_START_MIDNIGHT",
+                "00:00 da boshlangan smena keyingi kunga yoziladi, shuning uchun bunday vaqt qabul qilinmaydi",
+            )
+        minutes = duration_minutes(entry.start_time, entry.finish_time)
+    if minutes > MAX_DAY_MINUTES:
         _error(
             status.HTTP_400_BAD_REQUEST,
-            "REPORT_TIME_ORDER",
-            "Boshlanish vaqti tugash vaqtidan katta bo'lmasligi kerak",
+            "REPORT_DAY_TOO_LONG",
+            "Bir kunlik ish vaqti 9 soatdan oshmasligi kerak",
         )
 
 
@@ -471,10 +486,9 @@ class WorkReportService:
                 report.condition_1_label = _blank(payload.condition_1_label)
             if payload.condition_2_label is not None:
                 report.condition_2_label = _blank(payload.condition_2_label)
-        else:
-            for entry in payload.days:
-                if not entry.is_day_off:
-                    _reject_time_order(entry.start_time, entry.finish_time)
+
+        for entry in payload.days:
+            _reject_bad_day(entry, output)
 
         expected = set(month_dates(payload.year, payload.month))
         seen = set()
@@ -546,9 +560,7 @@ class WorkReportService:
         WorkReportService._ensure_editable(report)
         rtype = ReportType.parse(report.report_type)
 
-        if rtype is ReportType.HOURLY:
-            for day in report.days:
-                _reject_time_order(day.start_time, day.finish_time)
+
 
         days = {day.work_date: day for day in report.days}
         if rtype is ReportType.OUTPUT:
@@ -704,11 +716,42 @@ class WorkReportService:
         return serialize_report(WorkReportService._load(db, report_id))
 
     @staticmethod
-    def list_period_exports(db: Session, year: int, month: int) -> list[dict]:
-        """Every existing report of one period, drafts included, ready for export."""
-        rows = WorkReportRepository.list_for_period(db, year, month)
+    def list_period_exports(
+        db: Session,
+        year: int,
+        month: int,
+        *,
+        q: str | None = None,
+        statuses: list[str] | None = None,
+        report_types: list[str] | None = None,
+        project_id: UUID | None = None,
+        attention: str | None = None,
+        sort: str = "name",
+        order: str = "asc",
+    ) -> list[dict]:
+        """Filtrga mos hisobotlar. Draft hisobotlar eksportga kirmaydi."""
+        statuses = statuses or []
+        report_types = report_types or []
+        WorkReportService._check_filters(statuses, report_types, attention)
+        result = WorkReportRepository.search_period(
+            db,
+            year,
+            month,
+            q=q,
+            statuses=statuses or None,
+            report_types=report_types or None,
+            project_id=project_id,
+            attention=attention,
+            sort=sort,
+            order=order,
+            page=1,
+            limit=100000,
+        )
         return [
-            serialize_report(report) for _student, report in rows if report is not None
+            serialize_report(row[1])
+            for row in result["rows"]
+            if row[1] is not None
+            and ReportStatus.parse(row[1].status) is not ReportStatus.DRAFT
         ]
 
     @staticmethod
