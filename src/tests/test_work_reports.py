@@ -148,22 +148,18 @@ class TestWorkReports:
         assert overnight["overnight"] is False
         assert overnight["duration_minutes"] == 180
 
-        invalid = client.put(
-            f"/api/v1/reports/me/{report_id}",
-            json={
-                "year": year,
-                "month": month,
-                "days": [{
-                    "work_date": f"{year}-{month:02d}-02",
-                    "start_time": "22:00",
-                    "finish_time": "01:00",
-                    "description": "night",
-                    "is_day_off": False,
-                }],
-            },
+        night_payload = _payload(year, month, complete=True)
+        for day in night_payload["days"]:
+            if day["work_date"].endswith("-02"):
+                day["start_time"] = "22:00"
+                day["finish_time"] = "01:00"
+        night = client.put(f"/api/v1/reports/me/{report_id}", json=night_payload)
+        assert night.status_code == 200, night.text
+        night_day = next(
+            day for day in night.json()["data"]["days"] if day["work_date"].endswith("-02")
         )
-        assert invalid.status_code == 400
-        assert invalid.json()["detail"]["code"] == "REPORT_TIME_ORDER"
+        assert night_day["overnight"] is True
+        assert night_day["duration_minutes"] == 180
         assert saved_body["total_minutes"] == (day_count - 1) * 180
 
         submitted = client.post(f"/api/v1/reports/me/{report_id}/submit")
@@ -233,21 +229,20 @@ class TestWorkReports:
         exported = client.get(f"/api/v1/reports/{report_id}/export")
         assert exported.status_code == 200
         assert "spreadsheetml" in exported.headers["content-type"]
-        assert (
-            f"UZ240001_{year}-{month:02d}_Test%20monthly%20report.xlsx"
-            in exported.headers["content-disposition"]
-        )
+        disposition = exported.headers["content-disposition"]
+        assert "UZ240001_" in disposition
+        assert "_Karimova_Nilufar_hourly.xlsx" in disposition
         workbook = load_workbook(BytesIO(exported.content))
         sheet = workbook.active
         assert sheet["C3"].value == "UZ240001"
         assert sheet["C4"].value == "Karimova Nilufar"
         assert sheet["B2"].value == "成果報告書（固定制）　勤務記録表"
-        assert sheet["E7"].value == "=D7-C7"
+        assert sheet["E7"].value == "=MOD(D7-C7,1)"
         assert sheet["E38"].value == "=SUM(E7:E37)"
         assert sheet["C7"].value.hour == 0 and sheet["C7"].value.minute == 0
         assert sheet["F7"].value == "休み"
-        assert sheet["C8"].value.hour == 13
-        assert sheet["D8"].value.hour == 16
+        assert sheet["C8"].value.hour == 22
+        assert sheet["D8"].value.hour == 1
         assert sheet["C41"].value == "week one"
         assert sheet["I41"].value == 24000
         assert sheet["I47"].value == "承認"
@@ -328,7 +323,7 @@ class TestSeikaHoukokushoExcel:
         assert sheet["F8"].value == "work"
         assert sheet["C44"].value == "second week"
         assert sheet["I47"].value is None
-        assert sheet["E7"].value == "=D7-C7"
+        assert sheet["E7"].value == "=MOD(D7-C7,1)"
         assert sheet["E38"].value == "=SUM(E7:E37)"
 
 
@@ -369,23 +364,54 @@ class TestSeikaHoukokushoBulkExport:
         test_db.commit()
 
         items = client.get(f"/api/v1/reports?year={year}&month={month}").json()["data"]["items"]
-        downloadable = [item for item in items if item["report_id"]]
-        assert downloadable, "draft row must be downloadable by an admin"
-        assert any(item["status"] == "draft" for item in downloadable)
+        draft_row = next(item for item in items if item["report_id"] == str(draft.id))
+        assert draft_row["status"] == "draft"
+        assert draft_row["can_open"] is False
 
         _auth(client, staff_cookie)
         assert client.get("/api/v1/reports/export", params={"year": year, "month": month}).status_code == 403
-        assert client.get(f"/api/v1/reports/{downloadable[0]['report_id']}/export").status_code == 403
+        assert client.get(f"/api/v1/reports/{draft.id}/export").status_code == 403
 
         _auth(client, admin_cookie)
+        draft_export = client.get(f"/api/v1/reports/{draft.id}/export")
+        assert draft_export.status_code == 403
+        assert draft_export.json()["detail"]["code"] == "REPORT_DRAFT_HIDDEN"
+
+        only_draft = client.get("/api/v1/reports/export", params={"year": year, "month": month})
+        assert only_draft.status_code == 404
+        assert only_draft.json()["detail"]["code"] == "REPORT_EXPORT_EMPTY"
+
+        submitted = MonthlyReport(
+            student_id=linked_student.id,
+            year=year,
+            month=month,
+            title="Submitted monthly report",
+            status=ReportStatus.SUBMITTED,
+        )
+        test_db.add(submitted)
+        test_db.flush()
+        for day_number in range(1, last_day + 1):
+            test_db.add(
+                DailyReport(
+                    monthly_report_id=submitted.id,
+                    work_date=date(year, month, day_number),
+                    start_time=time(9, 0),
+                    finish_time=time(17, 0),
+                    description="work",
+                )
+            )
+        test_db.commit()
+
         archive = client.get("/api/v1/reports/export", params={"year": year, "month": month})
         assert archive.status_code == 200, archive.text
         assert archive.headers["content-type"] == "application/zip"
-        assert f"reports_{year}-{month:02d}.zip" in archive.headers["content-disposition"]
+        assert archive.headers["content-disposition"].startswith('attachment; filename="reports_')
+        assert ".zip" in archive.headers["content-disposition"]
 
         with ZipFile(_BytesIO(archive.content)) as bundle:
             names = bundle.namelist()
-            assert len(names) == len(downloadable)
+            assert len(names) == 1  # draft hisobot ZIP ga kirmaydi
+            assert names[0].endswith("_hourly.xlsx")
             for name in names:
                 assert name.endswith(".xlsx")
                 sheet = load_workbook(_BytesIO(bundle.read(name))).active

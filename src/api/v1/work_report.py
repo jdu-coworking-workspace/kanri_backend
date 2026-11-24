@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from src.api.deps import get_current_user, require_admin, require_staff_or_admin
 from src.database.session import get_db
 from src.models.user import User
+from src.utils.report_filename import archive_filename, content_disposition, report_filename
 from src.schemas.work_report import (
     MonthlyReportCreateIn,
     MonthlyReportUpdateIn,
@@ -86,10 +87,38 @@ def submit_own_report(
 def list_reports(
     year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
+    q: str | None = Query(None, max_length=100),
+    status_filter: list[str] = Query(default=[], alias="status"),
+    report_type: list[str] = Query(default=[]),
+    project_id: UUID | None = None,
+    attention: str | None = Query(None, pattern="^(submitted_stale|rejected)$"),
+    sort: str = Query(
+        "name",
+        pattern="^(name|total_hours|status|updated_at|submitted_at|completion)$",
+    ),
+    order: str = Query("asc", pattern="^(asc|desc)$"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_staff_or_admin),
 ):
-    return {"success": True, "data": WorkReportService.list_period(db, year, month)}
+    return {
+        "success": True,
+        "data": WorkReportService.search_period(
+            db,
+            year,
+            month,
+            q=q,
+            statuses=status_filter,
+            report_types=report_type,
+            project_id=project_id,
+            attention=attention,
+            sort=sort,
+            order=order,
+            page=page,
+            limit=limit,
+        ),
+    }
 
 
 # Declared before "/{report_id}" so the literal path wins over the UUID route.
@@ -97,25 +126,44 @@ def list_reports(
 def export_period(
     year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
+    q: str | None = Query(None, max_length=100),
+    status_filter: list[str] = Query(default=[], alias="status"),
+    report_type: list[str] = Query(default=[]),
+    project_id: UUID | None = None,
+    attention: str | None = Query(None, pattern="^(submitted_stale|rejected)$"),
+    sort: str = Query(
+        "name",
+        pattern="^(name|total_hours|status|updated_at|submitted_at|completion)$",
+    ),
+    order: str = Query("asc", pattern="^(asc|desc)$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    reports = WorkReportService.list_period_exports(db, year, month)
+    reports = WorkReportService.list_period_exports(
+        db,
+        year,
+        month,
+        q=q,
+        statuses=status_filter,
+        report_types=report_type,
+        project_id=project_id,
+        attention=attention,
+        sort=sort,
+        order=order,
+    )
     if not reports:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
                 "code": "REPORT_EXPORT_EMPTY",
-                "message": "Bu oy uchun hisobot topilmadi",
+                "message": "Hisobot topilmadi",
             },
         )
     content = build_period_archive(reports, year, month)
     return Response(
         content=content,
         media_type="application/zip",
-        headers={
-            "Content-Disposition": f'attachment; filename="reports_{year}-{month:02d}.zip"'
-        },
+        headers={"Content-Disposition": content_disposition(archive_filename())},
     )
 
 
@@ -161,13 +209,17 @@ def export_report(
     current_user: User = Depends(require_admin),
 ):
     report = WorkReportService.get_export_detail(db, report_id)
+    if report["status"] == "draft":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "REPORT_DRAFT_HIDDEN",
+                "message": "Qoralama hisobotni yuklab bo'lmaydi",
+            },
+        )
     content = build_monthly_report_xlsx(report)
-    filename = (
-        f"{report['student_code']}_{report['year']}-{report['month']:02d}_"
-        f"{quote(report['title'], safe='-_')}.xlsx"
-    )
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": content_disposition(report_filename(report))},
     )
